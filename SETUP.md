@@ -3,7 +3,7 @@
 The chat is GitHub Discussions embedded with giscus. Threads, reactions and moderation are built in, no server needed.
 It is threaded (not instant messaging) and users sign in with a free GitHub account.
 
-1. Create a **public** repository, e.g. `halley-astro-chat`, and push this folder to it.
+1. Create a **public** repository, e.g. `Cuspr`, and push this folder to it.
 2. Repo **Settings > General > Features**: tick **Discussions**.
 3. In **Discussions**, create a category named `General`.
 4. Install the giscus app: https://github.com/apps/giscus and grant it access to the repo.

@@ -1,9 +1,9 @@
 /* Community chat, hosted on a GitHub repository via giscus (GitHub Discussions).
    Fill CHAT_CONFIG after enabling Discussions on the repo and installing the giscus app (see github-repo/SETUP.md). */
 const CHAT_CONFIG = {
-  repo: "TheRealRickPrime/Cuspr",          // e.g. "yourname/halley-astro-chat"
-  repoId: "R_kgDOVHMpQA",        // from https://giscus.app
-  categoryId: "DIC_kwDOVHMpQM4DIT-T",    // from https://giscus.app
+  repo: "CusprAstro/CusprAstro.github.io",          // e.g. "yourname/halley-astro-chat"
+  repoId: "R_kgDOVHNzkg",        // from https://giscus.app
+  categoryId: "DIC_kwDOVHNzks4DIUBy",    // from https://giscus.app
   category: "General"
 };
 const CHAT_CHANNELS = [
