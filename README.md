@@ -29,6 +29,26 @@ Planetary positions come from [Astronomy Engine](https://github.com/cosinekitty/
 
 This is the first beta. Expect rough edges; please report issues or share feedback in Discussions.
 
+## Plans and licensing
+
+| | Free | Supporter | Pro |
+|---|---|---|---|
+| Chart wheel, houses, aspects | yes | yes | yes |
+| Natal reading | first 3 sections | complete | complete |
+| Forecast | 3 months | 6 months | 12 months |
+| Chart twins | top 3 | top 10 | top 25 |
+| Saved profiles | 2 | 10 | unlimited |
+| Print / save PDF | - | yes | yes |
+
+Licenses are offline keys signed with ECDSA P-256; the app only contains the public key. Configure your PayPal.me handle, prices and other payment links in `app/license.js` (`LICENSE_CONFIG`). Issue a key for a buyer with:
+
+```
+node tools/keygen.js init                     # once; creates the private key in D:\AstroChart\private (never commit it)
+node tools/keygen.js issue pro "buyer@email"  # prints a CUSPR1.… key to send to the buyer
+```
+
+Test builds with a forced tier: `python app/bundle.py supporter out.html` (`pro` also works; `-` builds the public edition). Client-side checks are honor-system protection and can be bypassed by a determined user.
+
 ## Disclaimer
 
 Astrology is symbolic and offered for reflection and entertainment. Rankings of astrologers and sites are qualitative, and chart resemblance does not predict anyone's fate.

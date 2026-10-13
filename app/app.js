@@ -8,10 +8,12 @@ const store = {
   set active(v) { try { localStorage.setItem("halley.active", v); } catch (e) {} },
 };
 const EXAMPLE = {name: "Example (Hinsdale, IL)", y: 1986, mo: 4, d: 22, h: 1, mi: 9, place: "Hinsdale, Illinois, United States", lat: 41.8008, lon: -87.937, tz: "America/Chicago"};
-const VIEWS = [["home", "🪐", "Birth Data"], ["chart", "🌌", "Chart"], ["reading", "📖", "Reading"], ["forecast", "🔭", "Forecast"], ["twins", "👯", "Chart Twins"], ["sources", "⭐", "Astrologers & Sites"], ["news", "📰", "Astrology News"], ["chat", "💬", "Chat"], ["about", "ℹ️", "Method"]];
+const VIEWS = [["home", "🪐", "Birth Data"], ["chart", "🌌", "Chart"], ["reading", "📖", "Reading"], ["forecast", "🔭", "Forecast"], ["twins", "👯", "Chart Twins"], ["sources", "⭐", "Astrologers & Sites"], ["news", "📰", "Astrology News"], ["chat", "💬", "Chat"], ["plans", "💎", "Plans"], ["about", "ℹ️", "Method"]];
 const HUES = [["#4a7bff", "#a05cff"], ["#ff7a59", "#ffb347"], ["#18b89a", "#4ad0ff"], ["#e0529c", "#8e5cff"], ["#7ac74f", "#2fb5a6"]];
 let view = "home", chart = null, prof = null, fcCache = {}, srcTab = "sites", srcQuery = "";
 
+const to24 = (h, ap) => { h = Math.min(12, Math.max(1, +h || 12)) % 12; return ap === "PM" ? h + 12 : h; };
+const fmt12 = (h, mi) => `${h % 12 || 12}:${String(mi).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
 function activeProfile() { const l = store.profiles; return l.find(p => p.id === store.active) || null; }
 function computeChart(p) {
   const h = p.unknownTime ? 12 : p.h, mi = p.unknownTime ? 0 : p.mi;
@@ -40,6 +42,7 @@ function render() {
   if (view === "home") m.innerHTML = homeView();
   else if (view === "sources") m.innerHTML = sourcesView();
   else if (view === "about") m.innerHTML = aboutView();
+  else if (view === "plans") m.innerHTML = plansView();
   else if (view === "news") { m.innerHTML = newsShell(); runNews(); }
   else if (view === "chat") { m.innerHTML = chatShell(); runChat(); }
   else if (!chart) m.innerHTML = needChart();
@@ -47,7 +50,7 @@ function render() {
   else if (view === "chart") m.innerHTML = chartView();
   else if (view === "reading") m.innerHTML = readingView();
   else if (view === "forecast") { m.innerHTML = forecastShell(); runForecast(); }
-  bind(); rail();
+  bind(); bindPlans(); rail();
 }
 
 /* ---------- Birth data ---------- */
@@ -66,8 +69,9 @@ function homeView() {
       <label>Month<select id="fmo">${["January","February","March","April","May","June","July","August","September","October","November","December"].map((m, i) => `<option value="${i + 1}">${m}</option>`).join("")}</select></label>
       <label>Day<input id="fd" type="number" min="1" max="31" required></label>
       <label>Year<input id="fy" type="number" min="1800" max="2100" required></label>
-      <label>Hour (0-23)<input id="fh" type="number" min="0" max="23" value="12"></label>
+      <label>Hour (1-12)<input id="fh" type="number" min="1" max="12" value="12"></label>
       <label>Minute<input id="fmi" type="number" min="0" max="59" value="0"></label>
+      <label>AM / PM<select id="fap"><option value="AM">AM</option><option value="PM" selected>PM</option></select></label>
     </div>
     <p class="tiny"><label style="flex-direction:row;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:13.5px"><input type="checkbox" id="fu" style="width:auto"> I don't know my birth time (Rising sign and houses will be approximate)</label></p>
     <div class="row"><label>Birth place<input id="fp" placeholder="City, region, country"></label><label style="max-width:150px">&nbsp;<button class="btn ghost" type="button" id="fgeo">Find place</button></label></div>
@@ -86,7 +90,7 @@ function bindHome() {
   const f = $("#f"); if (!f) return;
   let found = null;
   const msg = (t, e) => { const m = $("#fmsg"); m.textContent = t; m.className = "msg" + (e ? " err" : ""); };
-  const fill = p => { $("#fn").value = p.name; $("#fmo").value = p.mo; $("#fd").value = p.d; $("#fy").value = p.y; $("#fh").value = p.h; $("#fmi").value = p.mi; $("#fp").value = p.place; $("#fla").value = p.lat; $("#flo").value = p.lon; $("#ftz").value = p.tz; };
+  const fill = p => { $("#fn").value = p.name; $("#fmo").value = p.mo; $("#fd").value = p.d; $("#fy").value = p.y; $("#fh").value = p.h % 12 || 12; $("#fap").value = p.h < 12 ? "AM" : "PM"; $("#fmi").value = p.mi; $("#fp").value = p.place; $("#fla").value = p.lat; $("#flo").value = p.lon; $("#ftz").value = p.tz; };
   $("#fex").onclick = () => fill(EXAMPLE);
   $("#fgeo").onclick = async () => {
     const q = $("#fp").value.trim(); if (!q) return msg("Type a city first.", true);
@@ -107,13 +111,14 @@ function bindHome() {
   };
   f.onsubmit = ev => {
     ev.preventDefault();
-    const p = {id: "p" + Date.now(), name: $("#fn").value.trim() || "Me", y: +$("#fy").value, mo: +$("#fmo").value, d: +$("#fd").value, h: +$("#fh").value || 0, mi: +$("#fmi").value || 0, place: $("#fp").value.trim(), lat: parseFloat($("#fla").value), lon: parseFloat($("#flo").value), tz: $("#ftz").value.trim(), unknownTime: $("#fu").checked};
+    const p = {id: "p" + Date.now(), name: $("#fn").value.trim() || "Me", y: +$("#fy").value, mo: +$("#fmo").value, d: +$("#fd").value, h: to24($("#fh").value, $("#fap").value), mi: +$("#fmi").value || 0, place: $("#fp").value.trim(), lat: parseFloat($("#fla").value), lon: parseFloat($("#flo").value), tz: $("#ftz").value.trim(), unknownTime: $("#fu").checked};
     p.m = p.mo;
     if (!(p.y && p.d)) return msg("Please enter a valid date.", true);
     if (isNaN(p.lat) || isNaN(p.lon)) return msg("Please choose a place or enter latitude and longitude.", true);
     try { new Intl.DateTimeFormat("en-US", {timeZone: p.tz}); } catch (e) { return msg("Time zone not recognised. Use a name like America/Chicago or Europe/London.", true); }
     const test = new Date(Date.UTC(p.y, p.mo - 1, p.d));
     if (test.getUTCMonth() !== p.mo - 1) return msg("That date does not exist.", true);
+    if (store.profiles.length >= tier().profiles) return msg(`Your ${tier().name} plan allows ${tier().profiles} saved profiles. Remove one or see Plans.`, true);
     const l = store.profiles; l.push(p); store.profiles = l;
     setProfile(p); go("chart");
   };
@@ -182,7 +187,7 @@ function chartView() {
     `<tr><td class="gl">Asc</td><td>Ascendant</td><td>${fmtLon(c.asc)}</td><td>1</td></tr><tr><td class="gl">MC</td><td>Midheaven</td><td>${fmtLon(c.mc)}</td><td>10</td></tr>`;
   const asp = c.aspects.slice(0, 18).map(a => `<tr><td>${GLYPH[a.a] || a.a} ${a.a}</td><td class="${a.asp.tone}">${a.asp.g} ${a.asp.name}</td><td>${GLYPH[a.b] || a.b} ${a.b}</td><td>${a.orb.toFixed(1)}°</td></tr>`).join("");
   const cusps = c.cusps.map((x, i) => `<tr><td>${i + 1}</td><td>${fmtLon(x)}</td></tr>`).join("");
-  const dt = p.unknownTime ? "time unknown (12:00 used)" : `${String(p.h).padStart(2, "0")}:${String(p.mi).padStart(2, "0")}`;
+  const dt = p.unknownTime ? "time unknown (12:00 PM used)" : fmt12(p.h, p.mi);
   return `<div class="card fade"><h1>${esc(p.name)}'s chart</h1><p class="mut">${p.mo}/${p.d}/${p.y} · ${dt} · ${esc(p.place || p.lat.toFixed(2) + ", " + p.lon.toFixed(2))} · ${esc(p.tz)} · ${c.houseSystem}</p>
   <div class="chips"><span class="chip g">☉ ${signOf(c.lonOf.Sun)}</span><span class="chip g">☽ ${signOf(c.lonOf.Moon)}</span><span class="chip g">Asc ${signOf(c.asc)}</span><span class="chip">MC ${signOf(c.mc)}</span></div>
   ${p.unknownTime ? `<p class="msg">Birth time unknown: the Moon, Ascendant, Midheaven and houses may be off. Treat them as approximate.</p>` : ""}
@@ -204,22 +209,22 @@ function bindChart() {
 
 /* ---------- Reading ---------- */
 function readingView() {
-  const secs = natalReading(chart);
+  const all = natalReading(chart), secs = all.slice(0, tier().readingSections), locked = all.length > secs.length;
   const toc = secs.map((s, i) => `<span class="chip" style="cursor:pointer" onclick="document.getElementById('s${i}').scrollIntoView({behavior:'smooth',block:'start'})">${esc(s.title)}</span>`).join("");
-  return `<div class="card fade"><h1>Natal reading for ${esc(prof.name)}</h1><div class="chips">${toc}</div><div class="actions"><button class="btn sm ghost" onclick="window.print()">Print / Save PDF</button></div></div>` +
-    secs.map((s, i) => `<div class="card fade" id="s${i}"><h2>${esc(s.title)}</h2>${s.paras.map(t => `<p>${esc(t)}</p>`).join("")}</div>`).join("");
+  return `<div class="card fade"><h1>Natal reading for ${esc(prof.name)}</h1><div class="chips">${toc}</div>  <div class="actions">${printBtn()}</div></div>` +
+      (locked ? lockCard(`${all.length - secs.length} more reading sections`, "supporter") : "") + secs.map((s, i) => `<div class="card fade" id="s${i}"><h2>${esc(s.title)}</h2>${s.paras.map(t => `<p>${esc(t)}</p>`).join("")}</div>`).join("");
 }
 
 /* ---------- Forecast ---------- */
 let fcMonths = 6, fcStart = new Date().toISOString().slice(0, 10);
 function forecastShell() {
   return `<div class="card fade"><h1>Forecast</h1><p class="mut">Transits to your natal chart, stations, ingresses, lunations and eclipses.</p>
-  <div class="row" style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end"><label>Start date<input type="date" id="fs" value="${fcStart}"></label><label>Length<select id="fm">${[3, 6, 12].map(m => `<option value="${m}" ${m === fcMonths ? "selected" : ""}>${m} months</option>`).join("")}</select></label><button class="btn sm" id="fgo">Update</button><button class="btn sm ghost" onclick="window.print()">Print / Save PDF</button></div></div><div id="fcout"></div>`;
+  <div class="row" style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end"><label>Start date<input type="date" id="fs" value="${fcStart}"></label><label>Length<select id="fm">${[3, 6, 12].filter(m => m <= tier().forecastMonths).map(m => `<option value="${m}" ${m === fcMonths ? "selected" : ""}>${m} months</option>`).join("")}</select></label><button class="btn sm" id="fgo">Update</button>${printBtn()}</div>${tier().forecastMonths < 12 ? `<p class="tiny mut">Your plan includes forecasts up to ${tier().forecastMonths} months. <a href="#" onclick="go('plans');return false">See plans</a></p>` : ""}</div><div id="fcout"></div>`;
 }
 function runForecast() {
   const out = $("#fcout");
   const go = () => {
-    fcStart = $("#fs").value || fcStart; fcMonths = +$("#fm").value;
+    fcStart = $("#fs").value || fcStart; fcMonths = Math.min(+$("#fm").value, tier().forecastMonths);
     const key = fcStart + "|" + fcMonths;
     out.innerHTML = `<div class="card"><span class="spin"></span>Calculating planetary motions for ${fcMonths} months…</div>`;
     setTimeout(() => {
@@ -252,13 +257,13 @@ function miniWheel(c, size = 120) {
   return s + "</svg>";
 }
 function twinsView() {
-  const known = !prof.unknownTime, res = closestFamous(chart, known, 8);
+  const known = !prof.unknownTime, res = closestFamous(chart, known, tier().twins);
   const cards = res.map((r, i) => `<div class="card lift fade"><div style="display:flex;gap:16px;align-items:center"><div>${miniWheel(r.chart)}</div><div style="min-width:0"><div class="tier" style="font-size:11px;letter-spacing:1px;color:var(--gold);font-weight:700;text-transform:uppercase">#${i + 1} · ${r.pct}% resemblance · ${esc(r.f[2])}</div><h2 style="margin:2px 0">${esc(r.f[0])}</h2><div class="mut tiny">${esc(r.f[1])} · born ${esc(r.f[3])} · ${esc(r.f[4])}</div></div></div>
   <div class="chips"><span class="chip g">☉ ${signOf(r.chart.lonOf.Sun)}</span><span class="chip g">☽ ${signOf(r.chart.lonOf.Moon)}</span>${r.approx ? '<span class="chip">birth time unknown</span>' : `<span class="chip g">Asc ${signOf(r.chart.asc)}</span>`}</div>
   <p>${r.why.length ? "What you share: " + esc(r.why.join("; ")) + "." : "Only loose similarities."}</p>
   <div class="actions"><a class="btn sm ghost" href="${esc(famousDbLink(r.f[0]))}" target="_blank" rel="noopener">Astro-Databank</a></div></div>`).join("");
   return `<div class="card fade"><h1>Chart twins</h1><p class="mut">Closest matches to ${esc(prof.name)}'s chart among ${FAMOUS_DB.length} well-known (and infamous) people. Scoring weights Sun, Moon and Rising signs most, then the personal planets, tight degree matches, element balance and shared aspects.${known ? "" : " Rising sign and Midheaven are skipped because your birth time is unknown."}</p>
-  <p class="tiny">A resemblance is a symbolic similarity, not a prediction that you share someone's fate. Most entries (those marked "birth time unknown") are computed for local noon, so their Moon is approximate and Rising/Midheaven are not compared. Birth dates and places come from Wikidata (CC0). Many Astro-Databank times are disputed, and people with similar charts live very different lives.</p></div><div class="grid2">${cards}</div>`;
+  <p class="tiny">A resemblance is a symbolic similarity, not a prediction that you share someone's fate. Most entries (those marked "birth time unknown") are computed for local noon, so their Moon is approximate and Rising/Midheaven are not compared. Birth dates and places come from Wikidata (CC0). Many Astro-Databank times are disputed, and people with similar charts live very different lives.</p></div><div class="grid2">${cards}</div>${tier().twins < 25 ? lockCard("More chart twins", tier().twins < 10 ? "supporter" : "pro") : ""}`;
 }
 
 /* ---------- News ---------- */
@@ -328,6 +333,7 @@ $("#who").onclick = () => go("home");
 stars();
 const ap = activeProfile(); if (ap) { setProfile(ap); view = "chart"; }
 nav(); render();
+loadLicense().then(() => { nav(); render(); });
 if (/^#demo(-\w+)?$/.test(location.hash)) {
   const v = location.hash.split("-")[1] || "chart";
   setProfile({...EXAMPLE, id: "demo", mo: 4, m: 4}); view = v; nav(); render();

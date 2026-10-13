@@ -1,4 +1,4 @@
-import base64, io, os, re
+import base64, io, os, re, sys
 from PIL import Image, ImageDraw
 D = os.path.dirname(os.path.abspath(__file__))
 P = lambda *a: os.path.join(D, *a)
@@ -20,9 +20,12 @@ rd = lambda f: open(P(f), encoding="utf-8").read()
 safe = lambda s: s.replace("</script", "<\\/script")
 html = rd("index.html")
 parts = {"CSS": rd("style.css"), "ASTRONOMY": rd("astronomy.min.js"), "ENGINE": rd("engine.js"), "INTERP": rd("interp.js"),
-         "READING": rd("reading.js"), "REF": rd("astrologers.js"), "FAMOUS": rd("famous.js"), "FAMOUSDATA": rd("famous_data.js"), "FAMOUSMATCH": rd("famous_match.js"), "NEWS": rd("news.js"), "CHAT": rd("chat.js"), "APP": rd("app.js")}
+         "READING": rd("reading.js"), "REF": rd("astrologers.js"), "FAMOUS": rd("famous.js"), "FAMOUSDATA": rd("famous_data.js"), "FAMOUSMATCH": rd("famous_match.js"), "NEWS": rd("news.js"), "CHAT": rd("chat.js"), "LICENSE": rd("license.js"), "APP": rd("app.js")}
+# usage: python bundle.py [tier] [outfile]  (tier free|supporter|pro forces a local test build; omit for the public build)
+if len(sys.argv) > 1 and sys.argv[1] != "-":
+    parts["LICENSE"] = parts["LICENSE"].replace('const BUILD_TIER = "";', 'const BUILD_TIER = "%s";' % sys.argv[1])
 for k, v in parts.items():
     html = html.replace(f"/*@@{k}@@*/", safe(v).replace("url(icon.png)", f"url({icon_uri})") if k == "CSS" else safe(v))
 html = html.replace("icon.png", icon_uri)
-open(P("dist", "HalleyAstro.html"), "w", encoding="utf-8").write(html)
+open(sys.argv[2] if len(sys.argv) > 2 else P("dist", "HalleyAstro.html"), "w", encoding="utf-8").write(html)
 print("ok", len(html))
