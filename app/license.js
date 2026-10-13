@@ -2,7 +2,7 @@
    Licenses are offline keys signed with ECDSA P-256 (see tools/keygen.js). Only the public key lives in the app.
    This is honor-system protection suited to a small indie app: a determined user can bypass any client-side check. */
 const LICENSE_CONFIG = {
-  paypalMe: "",                 // your PayPal.me handle, e.g. "YourName" -> https://paypal.me/YourName/5
+  paypalMe: "lircin",                 // your PayPal.me handle, e.g. "YourName" -> https://paypal.me/YourName/5
   prices: {supporter: 5, pro: 15},
   currency: "USD",
   contact: "",                  // email address where buyers send their PayPal receipt to get a key
