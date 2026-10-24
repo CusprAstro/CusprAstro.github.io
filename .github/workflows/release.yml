@@ -38,7 +38,7 @@ jobs:
           done
       - uses: actions/upload-artifact@v4
         with:
-          name: cuspr-${{ github.ref_name }}-signed
+          name: cuspr-${{ github.run_id }}-signed
           path: release-assets/
           if-no-files-found: error
 
@@ -51,7 +51,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: cuspr-${{ github.ref_name }}-signed
+          name: cuspr-${{ github.run_id }}-signed
           path: release-assets
       - name: Publish signed public artifacts
         env:
