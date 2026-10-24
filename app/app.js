@@ -2,15 +2,15 @@
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
 const store = {
-  get profiles() { try { return JSON.parse(localStorage.getItem("halley.profiles") || "[]"); } catch (e) { return []; } },
-  set profiles(v) { try { localStorage.setItem("halley.profiles", JSON.stringify(v)); } catch (e) {} },
-  get active() { try { return localStorage.getItem("halley.active"); } catch (e) { return null; } },
-  set active(v) { try { localStorage.setItem("halley.active", v); } catch (e) {} },
+  get profiles() { try { return JSON.parse(localStorage.getItem("cuspr.profiles") || localStorage.getItem("halley.profiles") || "[]"); } catch (e) { return []; } },
+  set profiles(v) { try { localStorage.setItem("cuspr.profiles", JSON.stringify(v)); } catch (e) {} },
+  get active() { try { return localStorage.getItem("cuspr.active") || localStorage.getItem("halley.active"); } catch (e) { return null; } },
+  set active(v) { try { localStorage.setItem("cuspr.active", v); } catch (e) {} },
 };
 const EXAMPLE = {name: "Example (Hinsdale, IL)", y: 1986, mo: 4, d: 22, h: 1, mi: 9, place: "Hinsdale, Illinois, United States", lat: 41.8008, lon: -87.937, tz: "America/Chicago"};
-const VIEWS = [["home", "🪐", "Birth Data"], ["chart", "🌌", "Chart"], ["reading", "📖", "Reading"], ["forecast", "🔭", "Forecast"], ["twins", "👯", "Chart Twins"], ["sources", "⭐", "Astrologers & Sites"], ["news", "📰", "Astrology News"], ["chat", "💬", "Chat"], ["plans", "💎", "Plans"], ["about", "ℹ️", "Method"]];
+const VIEWS = [["home", "🪐", "Birth Data"], ["chart", "🌌", "Chart"], ["reading", "📖", "Reading"], ["forecast", "🔭", "Cosmic Planner"], ["twins", "👯", "Chart Twins"], ["sources", "⭐", "Astrologers & Sites"], ["news", "📰", "Astrology News"], ["chat", "💬", "Chat"], ["plans", "💎", "Plans"], ["about", "ℹ️", "Method"]];
 const HUES = [["#4a7bff", "#a05cff"], ["#ff7a59", "#ffb347"], ["#18b89a", "#4ad0ff"], ["#e0529c", "#8e5cff"], ["#7ac74f", "#2fb5a6"]];
-let view = "home", chart = null, prof = null, fcCache = {}, srcTab = "sites", srcQuery = "";
+let view = "home", chart = null, prof = null, fcCache = {}, plannerCache = {}, srcTab = "sites", srcQuery = "";
 
 const to24 = (h, ap) => { h = Math.min(12, Math.max(1, +h || 12)) % 12; return ap === "PM" ? h + 12 : h; };
 const fmt12 = (h, mi) => `${h % 12 || 12}:${String(mi).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
@@ -20,7 +20,7 @@ function computeChart(p) {
   return buildChart(localToUtc(p.y, p.mo, p.d, h, mi, p.tz), p.lat, p.lon);
 }
 function setProfile(p) {
-  prof = p; fcCache = {};
+  prof = p; fcCache = {}; plannerCache = {};
   chart = p ? computeChart(p) : null;
   if (p) store.active = p.id;
   header();
@@ -28,12 +28,17 @@ function setProfile(p) {
 function header() {
   $("#whoav").textContent = prof ? prof.name.trim().charAt(0).toUpperCase() || "?" : "?";
   $("#whoname").textContent = prof ? prof.name : "No profile";
+  const badge = $("#editionBadge"); if (badge) badge.innerHTML = planBadge();
 }
 function nav() {
-  $("#nav").innerHTML = VIEWS.map(([k, ic, t]) => `<div class="nav ${view === k ? "on" : ""}" data-v="${k}"><i>${ic}</i><span>${t}</span></div>`).join("");
+  $("#nav").innerHTML = VIEWS.map(([k, ic, t]) => `<button class="nav ${view === k ? "on" : ""}" data-v="${k}" aria-current="${view === k ? "page" : "false"}" title="${esc(t)}"><i aria-hidden="true">${ic}</i><span>${t}</span></button>`).join("");
   $("#nav").querySelectorAll(".nav").forEach(n => n.onclick = () => go(n.dataset.v));
 }
-function go(v) { view = v; nav(); render(); window.scrollTo({top: 0, behavior: "smooth"}); }
+function go(v) {
+  view = v; nav(); render();
+  window.scrollTo({top:0,behavior:matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"});
+  setTimeout(() => $("#main").focus({preventScroll:true}), 0);
+}
 function needChart() {
   return `<div class="card fade"><h2>Create a profile first</h2><p>Enter birth data to unlock this panel.</p><div class="actions"><button class="btn" onclick="go('home')">Go to Birth Data</button></div></div>`;
 }
@@ -60,7 +65,9 @@ function homeView() {
     const [a, b] = HUES[i % HUES.length];
     return `<div class="prof ${prof && p.id === prof.id ? "on" : ""}" data-id="${p.id}"><div class="big" style="background:linear-gradient(135deg,${a},${b})">${esc(p.name.trim().charAt(0).toUpperCase() || "?")}</div><div>${esc(p.name)}</div><small>${p.mo}/${p.d}/${p.y}</small><span class="x" data-del="${p.id}">remove</span></div>`;
   }).join("");
-  return `<div class="card hero fade"><h1>Your sky, calculated.</h1><p>Enter a birth date, time and place to see a natal chart, a written personality reading, and a forecast for the months ahead. Positions are computed in your browser from a high-precision astronomical ephemeris. Nothing is uploaded.</p><div class="chips"><span class="chip g">Tropical zodiac</span><span class="chip g">Placidus houses</span><span class="chip g">Transits · Eclipses · Progressions</span></div></div>
+  return `<div class="card hero fade"><span class="eyebrow">Private by design · ${esc(editionName())}</span><h1>Your sky, calculated.</h1><p>Create a precise natal chart, explore a professional written reading, and plan days with guidance grounded in real planetary transits. Core calculations happen on your device.</p><div class="chips"><span class="chip g">Tropical zodiac</span><span class="chip g">Placidus houses</span><span class="chip g">Daily transit planner</span><span class="chip">No account required</span></div>
+  <div class="onboard"><div><b>1</b><span>Add birth details</span></div><div><b>2</b><span>Explore your chart</span></div><div><b>3</b><span>Plan with context</span></div></div></div>
+  ${sponsoredCard("home")}
   ${ps.length ? `<div class="card fade"><h2>Profiles</h2><div class="profiles">${profs}</div></div>` : ""}
   <div class="card fade"><h2>New chart</h2>
   <form id="f" autocomplete="off">
@@ -215,18 +222,33 @@ function readingView() {
       (locked ? lockCard(`${all.length - secs.length} more reading sections`, "supporter") : "") + secs.map((s, i) => `<div class="card fade" id="s${i}"><h2>${esc(s.title)}</h2>${s.paras.map(t => `<p>${esc(t)}</p>`).join("")}</div>`).join("");
 }
 
-/* ---------- Forecast ---------- */
-let fcMonths = 6, fcStart = new Date().toISOString().slice(0, 10);
+/* ---------- Forecast and Cosmic Planner ---------- */
+let fcMonths = 6, fcStart = new Date().toISOString().slice(0, 10), forecastMode = "planner";
+let plannerSelected = new Date().toISOString().slice(0, 10), plannerDomain = "overall";
+let plannerAnchor = utcDate(plannerSelected);
+const plannerDateLabel = key => utcDate(key).toLocaleDateString("en-US", {weekday:"long",month:"long",day:"numeric",year:"numeric",timeZone:"UTC"});
+const plannerMonthLabel = d => d.toLocaleDateString("en-US", {month:"long",year:"numeric",timeZone:"UTC"});
+const domainOptions = () => PLANNER_DOMAINS.map(d => `<option value="${d.key}" ${plannerDomain === d.key ? "selected" : ""}>${d.label}</option>`).join("");
 function forecastShell() {
-  return `<div class="card fade"><h1>Forecast</h1><p class="mut">Transits to your natal chart, stations, ingresses, lunations and eclipses.</p>
-  <div class="row" style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end"><label>Start date<input type="date" id="fs" value="${fcStart}"></label><label>Length<select id="fm">${[3, 6, 12].filter(m => m <= tier().forecastMonths).map(m => `<option value="${m}" ${m === fcMonths ? "selected" : ""}>${m} months</option>`).join("")}</select></label><button class="btn sm" id="fgo">Update</button>${printBtn()}</div>${tier().forecastMonths < 12 ? `<p class="tiny mut">Your plan includes forecasts up to ${tier().forecastMonths} months. <a href="#" onclick="go('plans');return false">See plans</a></p>` : ""}</div><div id="fcout"></div>`;
+  const plannerControls = `<div class="planner-controls"><button class="btn sm ghost" id="pprev" aria-label="Previous month">←</button><label>Review date<input type="date" id="pdate" value="${plannerSelected}"></label><button class="btn sm ghost" id="ptoday">Today</button><button class="btn sm ghost" id="pnext" aria-label="Next month">→</button><label>Focus<select id="pdomain">${domainOptions()}</select></label></div>
+    <p class="tiny">Calendar access in this edition: ${tier().plannerMonths} month${tier().plannerMonths === 1 ? "" : "s"} ahead. Past dates remain available for reflective review.</p>`;
+  const timelineControls = `<div class="form-line"><label>Start date<input type="date" id="fs" value="${fcStart}"></label><label>Length<select id="fm">${[3,6,12].filter(m => m <= tier().forecastMonths).map(m => `<option value="${m}" ${m === fcMonths ? "selected" : ""}>${m} months</option>`).join("")}</select></label><button class="btn sm" id="fgo">Update timeline</button>${printBtn()}</div>
+    ${tier().forecastMonths < 12 ? `<p class="tiny">Your edition includes up to ${tier().forecastMonths} months. <a href="#" onclick="go('plans');return false">Compare editions</a>.</p>` : ""}`;
+  return `<div class="card hero compact fade"><span class="eyebrow">Personal timing · real transits</span><h1>Cosmic Planner</h1><p>Explore daily opportunities, pressure points and practical suggestions across ten life areas. Scores summarize current transits to your natal chart; they are not guarantees.</p>
+    <div class="tabs" role="tablist"><button class="tab ${forecastMode === "planner" ? "on" : ""}" data-fmode="planner" role="tab" aria-selected="${forecastMode === "planner"}">Daily planner</button><button class="tab ${forecastMode === "timeline" ? "on" : ""}" data-fmode="timeline" role="tab" aria-selected="${forecastMode === "timeline"}">Transit timeline</button></div></div>
+    <div class="card fade">${forecastMode === "planner" ? plannerControls : timelineControls}</div><div id="fcout" aria-live="polite"></div>`;
 }
 function runForecast() {
+  document.querySelectorAll("[data-fmode]").forEach(b => b.onclick = () => { forecastMode = b.dataset.fmode; render(); });
+  if (forecastMode === "planner") runPlanner();
+  else runTimeline();
+}
+function runTimeline() {
   const out = $("#fcout");
   const go = () => {
     fcStart = $("#fs").value || fcStart; fcMonths = Math.min(+$("#fm").value, tier().forecastMonths);
     const key = fcStart + "|" + fcMonths;
-    out.innerHTML = `<div class="card"><span class="spin"></span>Calculating planetary motions for ${fcMonths} months…</div>`;
+    out.innerHTML = `<div class="card loading"><span class="spin"></span>Calculating planetary motions for ${fcMonths} months…</div>`;
     setTimeout(() => {
       try {
         if (!fcCache[key]) {
@@ -234,11 +256,83 @@ function runForecast() {
           const ev = scanForecast(chart, start, Math.round(fcMonths * 30.5));
           fcCache[key] = forecastReading(chart, start, fcMonths, ev);
         }
-        out.innerHTML = forecastHtml(fcCache[key]);
-      } catch (e) { out.innerHTML = `<div class="card"><p class="msg err">Forecast failed: ${esc(e.message)}</p></div>`; }
+        out.innerHTML = forecastHtml(fcCache[key]) + sponsoredCard("forecast");
+      } catch (e) { out.innerHTML = `<div class="card error-state"><h2>We couldn't calculate this timeline</h2><p>${esc(e.message)}</p><button class="btn sm ghost" onclick="render()">Try again</button></div>`; }
     }, 40);
   };
   $("#fgo").onclick = go; go();
+}
+function runPlanner() {
+  const out = $("#fcout");
+  const load = () => {
+    const year = plannerAnchor.getUTCFullYear(), month = plannerAnchor.getUTCMonth();
+    const key = `${prof.id}|${year}-${month}|${plannerDomain}`;
+    out.innerHTML = `<div class="card loading"><span class="spin"></span>Reading daily transits for ${plannerMonthLabel(plannerAnchor)}…</div>`;
+    setTimeout(() => {
+      try {
+        const monthKey = `${prof.id}|${year}-${month}`;
+        if (!plannerCache[monthKey]) plannerCache[monthKey] = plannerMonth(chart, year, month);
+        const days = plannerCache[monthKey];
+        if (!days.some(d => d.date === plannerSelected)) plannerSelected = days[0].date;
+        const selected = days.find(d => d.date === plannerSelected) || days[0];
+        out.innerHTML = plannerHtml(days, selected);
+        bindPlannerDays(days);
+      } catch (e) {
+        out.innerHTML = `<div class="card error-state"><h2>We couldn't calculate this planner</h2><p>${esc(e.message)}</p><button class="btn sm ghost" onclick="render()">Try again</button></div>`;
+      }
+    }, 20);
+  };
+  $("#pdomain").onchange = e => { plannerDomain = e.target.value; load(); };
+  $("#pdate").onchange = e => {
+    if (!e.target.value) return;
+    const requested = utcDate(e.target.value), today = utcDate(new Date());
+    const max = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + tier().plannerMonths, today.getUTCDate(), 12));
+    if (requested > max) {
+      out.innerHTML = lockCard(`Planner dates beyond ${tier().plannerMonths} month${tier().plannerMonths === 1 ? "" : "s"}`, tier().plannerMonths < 6 ? "free_ads" : "pro");
+      return;
+    }
+    plannerSelected = e.target.value; plannerAnchor = requested; load();
+  };
+  $("#ptoday").onclick = () => { plannerSelected = new Date().toISOString().slice(0,10); plannerAnchor = utcDate(plannerSelected); $("#pdate").value = plannerSelected; load(); };
+  $("#pprev").onclick = () => { plannerAnchor = new Date(Date.UTC(plannerAnchor.getUTCFullYear(),plannerAnchor.getUTCMonth()-1,1,12)); plannerSelected = plannerDateKey(plannerAnchor); $("#pdate").value = plannerSelected; load(); };
+  $("#pnext").onclick = () => {
+    const next = new Date(Date.UTC(plannerAnchor.getUTCFullYear(),plannerAnchor.getUTCMonth()+1,1,12));
+    const today = utcDate(new Date()), max = new Date(Date.UTC(today.getUTCFullYear(),today.getUTCMonth()+tier().plannerMonths,today.getUTCDate(),12));
+    if (next > max) { out.innerHTML = lockCard(`More than ${tier().plannerMonths} month${tier().plannerMonths === 1 ? "" : "s"} of daily planning`, tier().plannerMonths < 6 ? "free_ads" : "pro"); return; }
+    plannerAnchor = next; plannerSelected = plannerDateKey(next); $("#pdate").value = plannerSelected; load();
+  };
+  load();
+}
+function scoreClass(score) { return score >= 64 ? "flow" : score <= 42 ? "caution" : "steady"; }
+function plannerHtml(days, selected) {
+  const first = utcDate(days[0].date).getUTCDay(), highlights = plannerHighlights(days, plannerDomain);
+  const scoreFor = day => day.domains.find(x => x.key === plannerDomain).score;
+  const calendar = `${Array.from({length:first}, () => `<span class="cal-empty"></span>`).join("")}${days.map(day => {
+    const score = scoreFor(day), n = +day.date.slice(-2);
+    return `<button class="cal-day ${scoreClass(score)} ${day.date === selected.date ? "selected" : ""}" data-pday="${day.date}" aria-label="${plannerDateLabel(day.date)}, ${score} out of 100"><span>${n}</span><b>${score}</b><i style="background:${day.color}"></i></button>`;
+  }).join("")}`;
+  const list = arr => arr.map(d => `<button class="day-link" data-pday="${d.date}"><span>${utcDate(d.date).toLocaleDateString("en-US",{month:"short",day:"numeric",timeZone:"UTC"})}</span><b>${scoreFor(d)}</b></button>`).join("");
+  return `<div class="planner-layout fade"><div class="card calendar-card"><div class="section-head"><div><span class="eyebrow">${PLANNER_DOMAIN[plannerDomain].label}</span><h2>${plannerMonthLabel(plannerAnchor)}</h2></div><div class="legend"><span class="flow">Flow</span><span class="steady">Steady</span><span class="caution">Caution</span></div></div>
+    <div class="weekdays">${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(x => `<span>${x}</span>`).join("")}</div><div class="calendar">${calendar}</div>
+    <div class="highlights"><div><h3>Best windows</h3>${list(highlights.best)}</div><div><h3>Use more care</h3>${list(highlights.caution)}</div></div></div>
+    <div>${plannerDetailHtml(selected)}</div></div>${sponsoredCard("planner")}
+    <div class="card safety fade"><b>Use this as symbolic weather, not a verdict.</b><p>Scores compare transit patterns within this calendar. They cannot promise luck, diagnose health, determine relationship outcomes, or replace professional advice and real-world safety checks.</p></div>`;
+}
+function plannerDetailHtml(day) {
+  const domains = plannerDomain === "overall" ? day.domains : day.domains.filter(x => x.key === plannerDomain || x.key === "overall");
+  const moon = `<div class="moon-strip"><span class="moon-dot" style="background:${day.color}"></span><div><span class="eyebrow">Daily Moon</span><b>${esc(day.moonSign)} · ${esc(fmtLon(day.moonLongitude))}</b><small>Theme: ${esc(day.theme)}<br>Color cue: <span style="color:${day.color}">${esc(day.color.toUpperCase())}</span> · Entertainment: ${esc(day.genre)}</small></div></div>`;
+  const cards = domains.map(d => `<article class="domain-card ${scoreClass(d.score)}"><div class="score-ring" style="--score:${d.score}"><b>${d.score}</b><span>/100</span></div><div class="domain-copy"><span class="eyebrow">${d.icon} ${esc(d.label)} · ${d.strength} signal · ${d.confidence} confidence</span><h3>${d.mode === "flow" ? "A constructive window" : d.mode === "caution" ? "Slow down and check assumptions" : "Work with the conditions"}</h3><p><b>Try:</b> ${esc(d.action)}</p><p><b>Avoid:</b> ${esc(d.avoid)}</p>${d.rationale.length ? `<details><summary>Why this score</summary><ul>${d.rationale.map(r => `<li>${esc(r)}</li>`).join("")}</ul></details>` : `<p class="tiny">No tight major transit dominates this area; the score stays near neutral.</p>`}</div></article>`).join("");
+  return `<div class="card day-detail"><div class="section-head"><div><span class="eyebrow">Date detail</span><h2>${plannerDateLabel(day.date)}</h2></div><span class="overall-score ${scoreClass(day.overall)}">${day.overall}<small>overall</small></span></div>${moon}<div class="domain-list">${cards}</div></div>`;
+}
+function bindPlannerDays() {
+  document.querySelectorAll("[data-pday]").forEach(b => b.onclick = () => {
+    plannerSelected = b.dataset.pday; $("#pdate").value = plannerSelected;
+    const selected = plannerCache[`${prof.id}|${plannerAnchor.getUTCFullYear()}-${plannerAnchor.getUTCMonth()}`].find(d => d.date === plannerSelected);
+    if (!selected) return;
+    document.querySelectorAll(".cal-day").forEach(x => x.classList.toggle("selected", x.dataset.pday === plannerSelected));
+    const detail = $(".day-detail"); detail.outerHTML = plannerDetailHtml(selected);
+    bindPlannerDays();
+  });
 }
 function forecastHtml(f) {
   const cur = f.current.map(t => `<p>${esc(t)}</p>`).join("");
@@ -293,14 +387,15 @@ function sourcesView() {
   <div class="grid fade">${list.map(x => `<a class="card lift ref" href="${esc(x.url)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none"><div class="tier">${esc(x.tier)}</div><h3>${esc(x.name)}</h3><p>${esc(x.blurb)}</p><div class="chips">${x.tags.map(t => `<span class="chip">${esc(t)}</span>`).join("")}</div></a>`).join("") || `<div class="card">No matches.</div>`}</div>`;
 }
 function aboutView() {
-  return `<div class="card fade"><h1>Method</h1>
+  return `<div class="card fade"><span class="eyebrow">Cuspr ${APP_VERSION}</span><h1>Method and boundaries</h1>
   <h3>Positions</h3><p>Planetary positions come from the open-source Astronomy Engine library (VSOP87 and related models), accurate to about an arcminute or better for the Sun through Pluto. The lunar node is the mean node.</p>
   <h3>Zodiac and houses</h3><p>Tropical zodiac and Placidus houses, the default in most Western astrology software. Above about 66° latitude Placidus is undefined, so whole-sign houses are used instead.</p>
   <h3>Time</h3><p>Local birth time is converted to UT using the IANA time zone database built into your browser, including historical daylight-saving rules.</p>
-  <h3>Aspects</h3><p>Conjunction, sextile, square, trine and opposition with moderate orbs. Forecasts use transits from Jupiter to Pluto, Mars, and the lunar node to natal points, plus stations, sign changes, lunations, eclipses, and secondary progressions.</p>
+  <h3>Forecasts and daily scores</h3><p>Conjunction, sextile, square, trine and opposition use moderate orbs. The transit timeline tracks major transits, stations, sign changes, lunations, eclipses and secondary progressions. Cosmic Planner scores weight the day's actual transits to natal planets and angles, their exactness, the transiting house and the Moon sign. Scores are relative symbolic signals, not probabilities or promises.</p>
   <h3>Interpretation</h3><p>Texts are written from common Western interpretive traditions (modern psychological and traditional). They are symbolic and general, and are not predictions of fact or advice.</p>
   <h3>Famous charts</h3><p>The Chart Twins database holds 1,000 well-known people: 54 curated entries with commonly cited birth times, and the rest ranked by Wikipedia page views, with birth dates and places from Wikidata (CC0). Entries without a known time are computed for local noon.</p>
-  <h3>Privacy</h3><p>Profiles are stored only in this browser (localStorage). Place search sends only the city name to the Open-Meteo geocoding service; skip it by typing coordinates manually.</p></div>`;
+  <h3>Privacy</h3><p>Profiles are stored only in this browser (localStorage). Place search sends only the city name to the Open-Meteo geocoding service; skip it by typing coordinates manually. Gumroad activation sends the selected product ID and purchaser key only to Gumroad's official verification API. Keys are stored locally for offline access and are never written to Cuspr logs.</p>
+  <h3>Safety</h3><p>Astrology is a symbolic tradition, not validated science. Cuspr does not provide medical, mental-health, legal, financial, relationship or safety advice. Use qualified professionals and practical evidence for consequential decisions.</p></div>`;
 }
 
 /* ---------- Rail ---------- */
@@ -311,7 +406,7 @@ function rail() {
     sky = ["Sun", "Moon", "Mercury", "Venus", "Mars", "Jupiter", "Saturn"].map(k => `<div class="mini"><span><span class="gl">${GLYPH[k]}</span> ${k}${p.rx[k] ? " ℞" : ""}</span><span class="mut">${fmtLon(p.lon[k])}</span></div>`).join("");
   } catch (e) {}
   const feat = REFERENCE.sites.slice(0, 4).map(s => `<div class="mini"><a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.name)}</a><span class="tiny">${esc(s.tier)}</span></div>`).join("");
-  $("#rail").innerHTML = `<div class="card"><h2>Sky right now</h2>${sky}</div><div class="card"><h2>Featured</h2>${feat}<div class="actions"><button class="btn sm ghost" onclick="go('sources')">See all</button></div></div>`;
+  $("#rail").innerHTML = `<div class="card rail-plan"><span class="eyebrow">Your edition</span><h2>${esc(editionName())}</h2><p class="tiny">${tier().plannerMonths}-month daily planner · ${tier().profiles >= 999 ? "Unlimited" : tier().profiles} profiles</p><button class="btn sm ghost" onclick="go('plans')">Manage plan</button></div><div class="card"><h2>Sky right now</h2>${sky}</div><div class="card"><h2>Featured</h2>${feat}<div class="actions"><button class="btn sm ghost" onclick="go('sources')">See all</button></div></div>`;
 }
 
 function bind() {
@@ -332,8 +427,8 @@ $("#q").addEventListener("keydown", e => { if (e.key === "Enter") { srcQuery = e
 $("#who").onclick = () => go("home");
 stars();
 const ap = activeProfile(); if (ap) { setProfile(ap); view = "chart"; }
-nav(); render();
-loadLicense().then(() => { nav(); render(); });
+header(); nav(); render();
+loadLicense().then(() => { header(); nav(); render(); });
 if (/^#demo(-\w+)?$/.test(location.hash)) {
   const v = location.hash.split("-")[1] || "chart";
   setProfile({...EXAMPLE, id: "demo", mo: 4, m: 4}); view = v; nav(); render();

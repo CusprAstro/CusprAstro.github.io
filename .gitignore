@@ -1,5 +1,8 @@
 node_modules/
+__pycache__/
 out/
 dist/
+release-assets/
+desktop/generated/
 private/
 *.pem

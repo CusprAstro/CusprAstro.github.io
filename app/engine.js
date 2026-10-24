@@ -1,4 +1,4 @@
-/* Halley Astro engine — tropical zodiac, Placidus houses, mean node. Uses astronomy-engine (global Astronomy). */
+/* Cuspr engine — tropical zodiac, Placidus houses, mean node. Uses astronomy-engine (global Astronomy). */
 const SIGNS = ["Aries","Taurus","Gemini","Cancer","Leo","Virgo","Libra","Scorpio","Sagittarius","Capricorn","Aquarius","Pisces"];
 const SIGN_GLYPH = "♈♉♊♋♌♍♎♏♐♑♒♓".split("");
 const GLYPH = {Sun:"☉",Moon:"☽",Mercury:"☿",Venus:"♀",Mars:"♂",Jupiter:"♃",Saturn:"♄",Uranus:"♅",Neptune:"♆",Pluto:"♇",Node:"☊",Asc:"Asc",MC:"MC"};
