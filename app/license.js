@@ -3,7 +3,7 @@
    Gumroad buyer keys are verified against Gumroad's official license API; product IDs are never treated as buyer keys. */
 const LICENSE_CONFIG = {
   paypalMe: "lircin",
-  prices: {supporter: 5, pro: 15},
+  prices: {supporter: 4.99, pro: 9.99},
   currency: "USD",
   gumroadProducts: {
     pro: "B2HpRnlL66EA931sJ9xOlg==",
@@ -19,6 +19,7 @@ const AFFILIATES = [
   {name: "AdGuard VPN", url: "https://adguard-vpn.com/?aid=138471", text: "Optional encrypted VPN service."},
   {name: "AdGuard DNS", url: "https://adguard-dns.io/?aid=138471", text: "Optional DNS-level filtering."},
 ];
+const BUILD_EDITION = "free";
 const BUILD_TIER = ""; // "pro" is allowed only in explicitly named local/test artifacts; public builds keep this empty.
 const TIERS = {
   free: {name: "Free", readingSections: 3, forecastMonths: 3, twins: 3, profiles: 2, print: false, plannerDays: 7, plannerHistory: 0, ads: false},
@@ -29,15 +30,19 @@ const TIERS = {
 const TIER_FEATURES = {
   free: ["Birth chart wheel, houses and aspects", "7-day Cosmic Planner", "First 3 reading sections", "3-month forecast", "Top 3 chart twins", "2 saved profiles", "Ad-free"],
   ads: ["Supporter feature limits at no cost", "Full current-month Cosmic Planner", "Complete reading", "6-month forecast", "Top 10 chart twins", "Restrained sponsored cards"],
-  supporter: ["Everything in Free with Ads", "No sponsored cards", "10 saved profiles", "Print / save as PDF", "One-time purchase"],
+  supporter: ["Everything in Free with Ads", "No sponsored cards", "10 saved profiles", "Print / save as PDF", "$4.99 monthly membership"],
   pro: ["Everything in Supporter", "24 months of planner history", "12-month forecast", "Top 25 chart twins", "Unlimited profiles", "All future Pro features"],
 };
 const ENTITLEMENT_KEY = "cuspr.entitlement.v2";
 const GUMROAD_RECHECK_MS = 7 * 86400000;
+const OFFLINE_GRACE_MS = 14 * 86400000;
 let licenseInfo = {tier: "free", source: "free", who: "", checkedAt: 0};
 
 function adsOptIn() {
-  try { return localStorage.getItem("cuspr.ads-opt-in") === "1"; } catch (e) { return false; }
+  try {
+    const saved = localStorage.getItem("cuspr.ads-opt-in");
+    return saved === "1" || (saved === null && BUILD_EDITION === "ads");
+  } catch (e) { return BUILD_EDITION === "ads"; }
 }
 const tierKey = () => BUILD_TIER || (licenseInfo.tier !== "free" ? licenseInfo.tier : adsOptIn() ? "ads" : "free");
 const tier = () => TIERS[tierKey()] || TIERS.free;
@@ -61,9 +66,13 @@ function readEntitlement() {
 function saveEntitlement(data) {
   try { localStorage.setItem(ENTITLEMENT_KEY, JSON.stringify(data)); } catch (e) {}
 }
-function gumroadPurchaseActive(result) {
+function gumroadMembershipState(result) {
   const p = result && result.purchase;
-  return Boolean(result && result.success && p && !p.refunded && !p.chargebacked && !p.subscription_ended_at);
+  if (!result || !result.success || !p) return {active: false, reason: "not-confirmed"};
+  if (p.refunded) return {active: false, reason: "refunded"};
+  if (p.chargebacked) return {active: false, reason: "chargeback"};
+  if (p.cancelled || p.subscription_cancelled_at || p.subscription_ended_at) return {active: false, reason: "cancelled"};
+  return {active: true, reason: "active"};
 }
 async function gumroadRequest(productId, key) {
   if (window.halleyNative && window.halleyNative.verifyGumroad) return window.halleyNative.verifyGumroad({productId, licenseKey: key});
@@ -76,10 +85,13 @@ async function verifyGumroadKey(key, requestedTier) {
   const productId = LICENSE_CONFIG.gumroadProducts[requestedTier];
   if (!productId || !key) return null;
   const result = await gumroadRequest(productId, key);
-  if (!gumroadPurchaseActive(result)) return null;
+  const state = gumroadMembershipState(result);
+  if (!state.active) return {inactive: true, reason: state.reason};
+  if (result.purchase.product_id && result.purchase.product_id !== productId) return {inactive: true, reason: "wrong-product"};
   return {
     tier: requestedTier, source: "gumroad", who: String(result.purchase.email || ""),
-    checkedAt: Date.now(), productId, licenseKey: String(key).trim(),
+    checkedAt: Date.now(), graceUntil: Date.now() + OFFLINE_GRACE_MS, productId, licenseKey: String(key).trim(),
+    membership: true, status: "active",
   };
 }
 async function loadLicense() {
@@ -105,14 +117,16 @@ async function loadLicense() {
     return licenseInfo;
   }
   if (saved.source === "gumroad" && saved.licenseKey && saved.productId && ["supporter", "pro"].includes(saved.tier)) {
-    licenseInfo = saved;
+    if ((saved.graceUntil || 0) < Date.now()) {
+      licenseInfo = {tier: "free", source: "free", who: "", checkedAt: 0, expired: true};
+    } else licenseInfo = saved;
     if (Date.now() - (saved.checkedAt || 0) >= GUMROAD_RECHECK_MS) {
       try {
         const fresh = await verifyGumroadKey(saved.licenseKey, saved.tier);
-        if (fresh) { saveEntitlement(fresh); licenseInfo = fresh; }
-        else { localStorage.removeItem(ENTITLEMENT_KEY); licenseInfo = {tier: "free", source: "free", who: "", checkedAt: 0}; }
+        if (fresh && !fresh.inactive) { saveEntitlement(fresh); licenseInfo = fresh; }
+        else { localStorage.removeItem(ENTITLEMENT_KEY); licenseInfo = {tier: "free", source: "free", who: "", checkedAt: 0, revokedReason: fresh && fresh.reason}; }
       } catch (e) {
-        licenseInfo = {...saved, offline: true};
+        licenseInfo = (saved.graceUntil || 0) >= Date.now() ? {...saved, offline: true} : {tier: "free", source: "free", who: "", checkedAt: 0, expired: true};
       }
     }
   }
@@ -130,7 +144,7 @@ async function activateLicense(key, requestedTier) {
   }
   try {
     const r = await verifyGumroadKey(clean, requestedTier);
-    if (!r) return {ok: false, message: `Gumroad did not confirm this as an active ${TIERS[requestedTier].name} purchase.`};
+    if (!r || r.inactive) return {ok: false, message: `Gumroad did not confirm an active ${TIERS[requestedTier].name} membership${r && r.reason ? ` (${r.reason})` : ""}.`};
     saveEntitlement(r); licenseInfo = r;
     return {ok: true, entitlement: r};
   } catch (e) {
@@ -146,8 +160,8 @@ function setAdsEdition(on) {
 }
 function buyLinks(t) {
   const L = LICENSE_CONFIG, amt = L.prices[t], out = [];
-  if (L.storefrontUrls[t]) out.push(`<a class="btn sm" href="${esc(L.storefrontUrls[t])}" target="_blank" rel="noopener noreferrer">Buy on Gumroad</a>`);
-  if (L.paypalMe) out.push(`<a class="btn sm ghost" href="https://paypal.me/${encodeURIComponent(L.paypalMe)}/${amt}${L.currency}" target="_blank" rel="noopener noreferrer">Pay ${amt} ${L.currency} with PayPal</a>`);
+  if (L.storefrontUrls[t]) out.push(`<a class="btn sm" href="${esc(L.storefrontUrls[t])}" target="_blank" rel="noopener noreferrer">Join on Gumroad · $${amt.toFixed(2)}/month</a>`);
+  if (L.paypalMe) out.push(`<a class="btn sm ghost" href="https://paypal.me/${encodeURIComponent(L.paypalMe)}" target="_blank" rel="noopener noreferrer">One-time tip via PayPal</a>`);
   return out.join(" ") + (!L.storefrontUrls[t] ? `<span class="tiny mut">Gumroad storefront URL pending; the configured value is a product ID, not a checkout link.</span>` : "");
 }
 const printBtn = () => tier().print ? `<button class="btn sm ghost" onclick="window.print()">Print / Save PDF</button>` : `<button class="btn sm ghost" onclick="go('plans')">🔒 Print / Save PDF</button>`;
@@ -162,17 +176,20 @@ function sponsoredPlacement(location) {
 function plansView() {
   const cur = tierKey(), L = LICENSE_CONFIG;
   const card = t => `<div class="card lift fade" style="${cur === t ? "outline:2px solid var(--gold)" : ""}"><div class="tier">${cur === t ? "Your edition" : "Edition"}</div>
-    <h2>${TIERS[t].name}${["supporter", "pro"].includes(t) ? ` · ${L.prices[t]} ${L.currency}` : ""}</h2><ul>${TIER_FEATURES[t].map(f => `<li>${esc(f)}</li>`).join("")}</ul>
+    <h2>${TIERS[t].name}${["supporter", "pro"].includes(t) ? ` · $${L.prices[t].toFixed(2)}/month` : ""}</h2><ul>${TIER_FEATURES[t].map(f => `<li>${esc(f)}</li>`).join("")}</ul>
     ${["supporter", "pro"].includes(t) ? `<div class="actions">${buyLinks(t)}</div>` : t === "ads" ? `<div class="actions"><button class="btn sm" id="ads-toggle">${cur === "ads" ? "Use ad-free Free" : "Use Free with Ads"}</button></div>` : ""}</div>`;
   const test = BUILD_TIER ? `<p class="msg">Unlocked Pro test build. This is a local QA artifact and must not replace the public build.</p>` : "";
-  const status = licenseInfo.source === "gumroad" ? `Verified Gumroad purchase (${maskKey(licenseInfo.licenseKey)})${licenseInfo.offline ? " · using offline cache" : ""}` :
+  const target = ["supporter", "pro"].includes(BUILD_EDITION) ? `<p class="msg">This package is tailored for ${TIERS[BUILD_EDITION].name} members. Sign in with the matching Gumroad license key to unlock it.</p>` : "";
+  const graceText = licenseInfo.graceUntil ? ` · offline through ${new Date(licenseInfo.graceUntil).toLocaleDateString()}` : "";
+  const status = licenseInfo.source === "gumroad" ? `Active Gumroad membership (${maskKey(licenseInfo.licenseKey)})${licenseInfo.offline ? " · using offline cache" : ""}${graceText}` :
     licenseInfo.source === "complimentary" ? `Signed complimentary key${licenseInfo.who ? ` for ${esc(licenseInfo.who)}` : ""}` : "No paid entitlement";
-  return `<div class="card fade"><h1>Choose your Cuspr edition</h1><p class="mut">Free stays ad-free and useful. Free with Ads voluntarily unlocks Supporter limits. Supporter and Pro are ad-free one-time editions.</p>${test}</div>
+  return `<div class="card fade"><h1>Choose your Cuspr edition</h1><p class="mut">Free stays ad-free and useful. Free with Ads voluntarily unlocks Supporter limits. Supporter and Pro are ad-free recurring Gumroad memberships.</p>${test}${target}</div>
   <div class="grid2">${card("free")}${card("ads")}${card("supporter")}${card("pro")}</div>
   <div class="card fade"><h2>Verify a purchase or complimentary key</h2><p class="mut">Current status: <b>${status}</b></p>
-  <div class="row"><label>Edition<select id="ltype"><option value="pro">Pro</option><option value="supporter">Supporter</option></select></label><label>Buyer or complimentary key<input id="lkey" type="password" placeholder="Gumroad buyer key or CUSPR1.…" autocomplete="off" spellcheck="false"></label></div>
+  <div class="row"><label>Edition<select id="ltype"><option value="pro" ${BUILD_EDITION !== "supporter" ? "selected" : ""}>Pro</option><option value="supporter" ${BUILD_EDITION === "supporter" ? "selected" : ""}>Supporter</option></select></label><label>Buyer or complimentary key<input id="lkey" type="password" placeholder="Gumroad buyer key or CUSPR1.…" autocomplete="off" spellcheck="false"></label></div>
   <div class="actions"><button class="btn sm" id="lact">Verify and unlock</button>${licenseInfo.tier !== "free" && !BUILD_TIER ? '<button class="btn sm ghost" id="lrem">Remove entitlement</button>' : ""}</div><div class="msg" id="lmsg" role="status" aria-live="polite"></div>
-  <p class="tiny">Verification uses Gumroad's official license endpoint. Buyer keys are cached locally for periodic revalidation and offline use, never printed to logs, and can be removed here. Product IDs alone cannot unlock anything.</p></div>
+  <p class="tiny">Verification uses Gumroad's official license endpoint. Active memberships revalidate every 7 days and have a 14-day offline grace period from the last successful check. Cancelled, ended, refunded or chargebacked memberships are removed on revalidation. Buyer keys are stored only on this device, never printed to logs, and can be removed here.</p>
+  <div class="actions"><button class="btn sm ghost" id="lrestore">Restore / revalidate purchase</button><a class="btn sm ghost" href="https://cusprastro.github.io/membership.html" target="_blank" rel="noopener noreferrer">Membership help</a></div></div>
   ${sponsoredPlacement("plans")}`;
 }
 function bindPlans() {
@@ -188,4 +205,15 @@ function bindPlans() {
     else { m.className = "msg err"; m.textContent = result.message; }
   };
   const r = $("#lrem"); if (r) r.onclick = () => { deactivateLicense(); render(); };
+  const restore = $("#lrestore");
+  if (restore) restore.onclick = async () => {
+    const saved = readEntitlement(), m = $("#lmsg");
+    if (!saved || saved.source !== "gumroad") { m.className = "msg err"; m.textContent = "Enter your Gumroad membership key above to restore a purchase."; return; }
+    m.className = "msg"; m.textContent = "Revalidating membership…";
+    try {
+      const fresh = await verifyGumroadKey(saved.licenseKey, saved.tier);
+      if (fresh && !fresh.inactive) { saveEntitlement(fresh); licenseInfo = fresh; m.textContent = "Membership restored and grace period refreshed."; setTimeout(render, 600); }
+      else { deactivateLicense(); m.className = "msg err"; m.textContent = `Membership is not active${fresh && fresh.reason ? ` (${fresh.reason})` : ""}.`; }
+    } catch (e) { m.className = "msg err"; m.textContent = "Gumroad is unreachable. Your existing access remains available until the offline grace date."; }
+  };
 }

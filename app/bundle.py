@@ -30,10 +30,14 @@ rd = lambda f: open(P(f), encoding="utf-8").read()
 safe = lambda s: s.replace("</script", "<\\/script")
 html = rd("index.html")
 parts = {"CSS": rd("style.css"), "ASTRONOMY": rd("astronomy.min.js"), "ENGINE": rd("engine.js"), "INTERP": rd("interp.js"),
-         "READING": rd("reading.js"), "REF": rd("astrologers.js"), "FAMOUS": rd("famous.js"), "FAMOUSDATA": rd("famous_data.js"), "FAMOUSMATCH": rd("famous_match.js"), "NEWS": rd("news.js"), "CHAT": rd("chat.js"), "LICENSE": rd("license.js"), "PLANNER": rd("planner.js"), "APP": rd("app.js")}
-# usage: python bundle.py [tier] [outfile]  (tier free|supporter|pro forces a local test build; omit for the public build)
-if len(sys.argv) > 1 and sys.argv[1] != "-":
-    parts["LICENSE"] = parts["LICENSE"].replace('const BUILD_TIER = "";', 'const BUILD_TIER = "%s";' % sys.argv[1])
+         "READING": rd("reading.js"), "REF": rd("astrologers.js"), "FAMOUS": rd("famous.js"), "FAMOUSDATA": rd("famous_data.js"), "FAMOUSMATCH": rd("famous_match.js"), "NEWS": rd("news.js"), "CHAT": rd("chat.js"), "LICENSE": rd("license.js"), "PLANNER": rd("planner.js"), "PWA": rd("pwa.js"), "APP": rd("app.js")}
+# usage: python bundle.py [edition] [outfile] [unlock]
+# edition controls presentation/default selection only. The optional literal "unlock" creates a local QA artifact.
+edition = sys.argv[1] if len(sys.argv) > 1 and sys.argv[1] != "-" else "free"
+if edition not in ("free", "ads", "supporter", "pro"): raise SystemExit("invalid edition")
+parts["LICENSE"] = parts["LICENSE"].replace('const BUILD_EDITION = "free";', 'const BUILD_EDITION = "%s";' % edition)
+if len(sys.argv) > 3 and sys.argv[3] == "unlock":
+    parts["LICENSE"] = parts["LICENSE"].replace('const BUILD_TIER = "";', 'const BUILD_TIER = "pro";')
 for k, v in parts.items():
     html = html.replace(f"/*@@{k}@@*/", safe(v).replace("url(icon.png)", f"url({icon_uri})") if k == "CSS" else safe(v))
 html = html.replace("icon.svg", icon_uri).replace("icon.png", icon_uri)

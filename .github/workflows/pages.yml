@@ -15,7 +15,12 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - run: mkdir site && cp index.html site/index.html && touch site/.nojekyll
+      - run: |
+          mkdir -p site/launch site/icons
+          cp index.html site.css offline.html privacy.html terms.html refunds.html affiliate.html support.html membership.html product-facts.html site/
+          cp launch/index.html launch/manifest.webmanifest launch/sw.js site/launch/
+          cp icons/Cuspr_icon_*.png icons/Cuspr_Gumroad_600.png site/icons/
+          touch site/.nojekyll
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

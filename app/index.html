@@ -3,15 +3,22 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#10163f">
+<meta name="description" content="Private birth charts, real-ephemeris Cosmic Planner, readings and forecasts. Installable on Android and desktop.">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Cuspr: Birth Chart, Forecast and Cosmic Planner</title>
 <link rel="icon" href="icon.svg">
+<link rel="manifest" href="manifest.webmanifest">
 <style>/*@@CSS@@*/</style>
 </head>
 <body>
 <canvas id="stars"></canvas>
+<div id="pwa-banner" class="pwa-banner" hidden role="status" aria-live="polite"></div>
 <header class="top">
-  <div class="brand"><img src="icon.svg" alt=""><div>Cuspr <small style="display:inline;color:var(--gold)">v0.3 BETA</small><small>Chart · Planner · Forecast</small></div></div>
+  <div class="brand"><img src="icon.svg" alt=""><div>Cuspr <small style="display:inline;color:var(--gold)">v0.4 BETA</small><small>Chart · Planner · Forecast</small></div></div>
   <div class="search"><input id="q" placeholder="Search readings, sources, astrologers…" autocomplete="off"></div>
+  <button class="btn sm ghost install-btn" id="install-app" hidden>Install</button>
   <div class="who" id="who"><div class="av" id="whoav">?</div><span id="whoname">No profile</span></div>
 </header>
 <div class="shell">
@@ -32,6 +39,7 @@
 <script>/*@@CHAT@@*/</script>
 <script>/*@@LICENSE@@*/</script>
 <script>/*@@PLANNER@@*/</script>
+<script>/*@@PWA@@*/</script>
 <script>/*@@APP@@*/</script>
 </body>
 </html>

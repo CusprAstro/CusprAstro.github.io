@@ -1,7 +1,7 @@
 {
   "name": "cuspr",
   "productName": "Cuspr",
-  "version": "0.3.0-beta.1",
+  "version": "0.4.0-beta.1",
   "description": "Private birth chart, Cosmic Planner, reading and forecast app",
   "main": "main.js",
   "scripts": {

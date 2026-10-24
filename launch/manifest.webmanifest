@@ -1,0 +1,23 @@
+{
+  "id": "./",
+  "name": "Cuspr Cosmic Planner",
+  "short_name": "Cuspr",
+  "description": "Private birth charts, a real-ephemeris Cosmic Planner, readings and forecasts.",
+  "start_url": "./?source=pwa",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "background_color": "#070b1f",
+  "theme_color": "#10163f",
+  "orientation": "any",
+  "categories": ["lifestyle", "entertainment"],
+  "icons": [
+    {"src": "../icons/Cuspr_icon_180.png", "sizes": "180x180", "type": "image/png"},
+    {"src": "../icons/Cuspr_icon_256.png", "sizes": "256x256", "type": "image/png"},
+    {"src": "../icons/Cuspr_icon_512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
+  ],
+  "shortcuts": [
+    {"name": "Cosmic Planner", "short_name": "Planner", "url": "./#demo-planner"},
+    {"name": "Plans", "short_name": "Plans", "url": "./#plans"}
+  ]
+}

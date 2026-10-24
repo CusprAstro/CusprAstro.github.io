@@ -1,95 +1,77 @@
-# Cuspr v0.3.0 beta
+# Cuspr v0.4.0 beta
 
-Live app: https://cusprastro.github.io/
+**Website:** https://cusprastro.github.io/<br>
+**Launch the app:** https://cusprastro.github.io/launch/<br>
+**Plans and activation:** https://cusprastro.github.io/launch/#plans
 
-Cuspr is a private, installable astrology app for birth charts, written readings, transit forecasts and a real-ephemeris Cosmic Planner. It runs as a single browser file or an offline-capable Windows Electron app. Birth profiles stay in local storage and are not uploaded.
+Cuspr is a private astrology studio and real-ephemeris Cosmic Planner. The GitHub Pages property is both the commercial website and the installable web app: the root is a polished product/commerce experience, while `/launch/` is the full application. The same app is packaged for Windows with aligned visuals and features.
 
-## v0.3 consumer beta
+## Platforms
 
-- **Cosmic Planner:** day/month calendar with transit-derived scores for overall momentum, luck, love, career, money and purchases, non-medical health and energy, travel, creativity and entertainment, home and family, communication and learning, and rest and reflection
-- Best and caution days, suggested and avoid actions, score rationale, strength/confidence, Moon theme, color and movie genre
-- Category filters, date detail, local seven-day cache and Pro history navigation
-- **Chart:** tropical zodiac, Placidus houses, aspects and downloadable wheel
-- **Reading and forecast:** natal interpretation plus transits, eclipses, stations, ingresses and secondary progressions
-- **Chart Twins, sources, news and discussion**
-- Responsive keyboard-accessible interface for mobile and desktop
+- **Android and desktop browsers:** installable Progressive Web App with manifest, service worker, offline shell, update prompts, responsive touch UI and safe-area handling
+- **Windows x64:** Electron desktop package using the same generated app bundle and theme
+- Cuspr is accurately described as an installable PWA on Android, **not a native APK**
 
-Astrology is symbolic and offered for reflection and entertainment. Planner scores are not medical, financial, legal, safety or travel advice.
+## Editions and recurring membership
 
-## Editions
+| Edition | Price | Access |
+|---|---:|---|
+| Free | $0 | ad-free essentials, rolling seven-day planner |
+| Free with Ads | $0 | Supporter feature limits with restrained disclosed affiliate cards |
+| Supporter | **$4.99/month** | full current month, complete reading, six-month forecast, printing, ad-free |
+| Pro | **$9.99/month** | 24-month planner history, 12-month forecast, unlimited profiles, ad-free |
 
-| | Free | Free with Ads | Supporter | Pro |
-|---|---:|---:|---:|---:|
-| Advertising | none | restrained sponsored cards | none | none |
-| Cosmic Planner | rolling 7 days | current month | current month | current month + 24-month history |
-| Reading | first 3 sections | complete | complete | complete |
-| Forecast | 3 months | 6 months | 6 months | 12 months |
-| Chart twins | top 3 | top 10 | top 10 | top 25 |
-| Saved profiles | 2 | 10 | 10 | unlimited |
-| Print / save PDF | - | yes | yes | yes |
+Supporter and Pro use recurring Gumroad memberships. Existing product IDs:
 
-Free with Ads is an explicit opt-in and receives Supporter feature limits. Sponsored cards appear only on Home, Plans, the end of News and the end of Forecast. They use ordinary links—no trackers, injected scripts, popups or automatic downloads—and carry an affiliate disclosure.
-
-Configured affiliate destinations:
-
-- `https://adguard.com/?aid=138471`
-- `https://adguard-vpn.com/?aid=138471`
-- `https://adguard-dns.io/?aid=138471`
-
-Promo/install link arrays are present in `app/license.js` but intentionally empty until owner-supplied URLs are available.
-
-## Purchase verification
-
-Gumroad product IDs:
-
-- Pro: `B2HpRnlL66EA931sJ9xOlg==`
 - Supporter: `S0wa78i_Tu7s5_A65WTrPg==`
+- Pro: `B2HpRnlL66EA931sJ9xOlg==`
 
-These are **product IDs, not buyer keys and not storefront URLs**. A customer must paste the buyer/license key from a real Gumroad purchase. Cuspr verifies it through Gumroad's official `POST /v2/licenses/verify` endpoint, using an allowlisted Electron IPC proxy in the desktop build. Successful entitlements are cached locally for offline use and revalidated periodically; revoked/refunded purchases are removed when Gumroad confirms they are inactive. Full keys are never logged and users can remove the cached entitlement from Plans.
+Membership activation requires the buyer license key from a real purchase and verifies the matching product ID through Gumroad's official license endpoint. Cancelled, ended, refunded and chargebacked memberships are rejected. Successful verification is cached locally, checked every seven days, and grants a clearly disclosed 14-day offline grace period from the last successful verification.
 
-The actual Gumroad storefront URLs and real purchaser keys were not supplied, so the app does not invent checkout links or fake verification success. PayPal.me/lircin remains available. Seller-issued complimentary `CUSPR1` keys signed with ECDSA P-256 remain supported:
+Real storefront/permalink URLs and real purchaser keys have not been supplied. Cuspr does not fake them. Follow [GUMROAD_SETUP.md](GUMROAD_SETUP.md) to create/configure the memberships, paste the URLs, test real keys, and define final refunds.
 
-```powershell
-node tools\keygen.js init
-node tools\keygen.js issue pro "buyer@email"
-```
+PayPal.me/lircin remains a one-time tip and does not grant recurring access unless the owner manually issues a signed complimentary `CUSPR1` key.
 
-The private key defaults to `D:\AstroChart\private` and must never be committed.
+## Product
 
-## Build and test
+- Real planetary positions from Astronomy Engine
+- Cosmic Planner with 11 scored dimensions, rationale, confidence, best/caution days and Moon themes
+- Tropical natal chart, Placidus houses, aspects and exports
+- Written reading, transit forecast, progressions, lunations and eclipses
+- Chart Twins, curated references, astrology news and optional GitHub Discussions
+- Local profiles and entitlement cache; no Cuspr account database
+- Static, disclosed affiliate cards only in the approved four locations; no ad network scripts or trackers
 
-Requirements: Python 3 with Pillow, Node.js 22, and desktop dependencies installed with `npm ci` in `desktop\`.
+Astrology is symbolic and for reflection/entertainment, not medical, legal, financial, safety or travel advice.
+
+## Develop and test
+
+Requirements: Python 3 + Pillow, Node.js 22, and `npm ci` in `desktop\`.
 
 ```powershell
 node tests\run-tests.js
-python app\bundle.py - index.html
-.\scripts\build-release.ps1 -Version 0.3.0-beta
+python app\bundle.py free launch\index.html
+.\scripts\build-release.ps1 -Version 0.4.0-beta -IncludeTestBuild
 ```
 
-The release script creates:
+`scripts\build-release.ps1` creates five edition ZIPs. Each of the four public edition ZIPs contains a PWA folder and a Windows x64 folder; the fifth is the local-only unlocked Pro Windows test package. Supporter/Pro public packages are **locked** and still require a matching active Gumroad key; they are not forced paid builds.
 
-- `release\Cuspr-0.3.0-beta-web.zip`
-- `release\Cuspr-0.3.0-beta-windows-x64.zip`
-- `release\SHA256SUMS`
+The public GitHub workflow uploads only locked public artifacts. It generates SHA-256 checksums, an SPDX SBOM and keyless Sigstore bundles. See [VERIFY_RELEASE.md](VERIFY_RELEASE.md). Sigstore artifact signing is not Windows Authenticode.
 
-`-IncludeTestBuild` additionally creates `release\Cuspr-0.3.0-beta-unlocked-pro-test.zip` for local QA only. It is intentionally excluded from the GitHub Actions release workflow and must not be publicly shipped or sold. The normal public build is universal: edition access is selected by ad opt-in or verified entitlement rather than forced at build time.
+## Stable integration URLs
 
-## Artifact signing
+Concise public facts for the Quasar Labs site are maintained at [product-facts.html](product-facts.html), including stable links, pricing, platform language and product IDs.
 
-`.github/workflows/release-beta.yml` builds the public artifacts, generates an SPDX JSON SBOM, writes `SHA256SUMS`, and uses keyless Sigstore/cosign OIDC signing. Each artifact and the checksum file receives a `.sigstore.json` bundle. Workflow permissions are limited to `contents: read` and `id-token: write`.
+The existing `cusprastro.github.io` user/org site is already the ideal dedicated GitHub subdomain. A custom domain can be added through GitHub Pages DNS/CNAME settings later; another `github.io` hostname cannot be invented without another GitHub account/organization.
 
-Sigstore bundles prove the workflow identity and artifact integrity. They are **not Windows Authenticode signatures**, so Windows may still show an unknown-publisher warning until a separate code-signing certificate is configured.
+## Legal and support
 
-## Project layout
-
-- `app\`: editable web source and bundler
-- `desktop\`: Electron wrapper
-- `tests\`: dependency-free behavioral/static tests
-- `scripts\build-release.ps1`: local reproducible packaging
-- `.github\workflows\pages.yml`: Pages deployment
-- `.github\workflows\release-beta.yml`: beta build, SBOM and signing
-
-Astronomical positions use [Astronomy Engine](https://github.com/cosinekitty/astronomy) (MIT). Famous-chart source notes remain in the app's Method screen.
+- [Privacy](privacy.html)
+- [Terms](terms.html)
+- [Refunds and cancellations](refunds.html)
+- [Affiliate disclosure](affiliate.html)
+- [Membership help](membership.html)
+- [Support](support.html)
 
 ## License
 

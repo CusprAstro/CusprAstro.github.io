@@ -398,4 +398,6 @@ loadLicense().then(() => { nav(); render(); });
 if (/^#demo(-\w+)?$/.test(location.hash)) {
   const v = location.hash.split("-")[1] || "chart";
   setProfile({...EXAMPLE, id: "demo", mo: 4, m: 4}); view = v; nav(); render();
+} else if (/^#(home|planner|chart|reading|forecast|twins|sources|news|chat|plans|about)$/.test(location.hash)) {
+  view = location.hash.slice(1); nav(); render();
 }

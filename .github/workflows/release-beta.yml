@@ -5,7 +5,7 @@ on:
       version:
         description: Beta version label
         required: true
-        default: 0.3.0-beta
+        default: 0.4.0-beta
 permissions:
   contents: read
   id-token: write
@@ -27,7 +27,7 @@ jobs:
         working-directory: desktop
       - run: npm test
         working-directory: desktop
-      - name: Build public universal edition
+      - name: Build public locked editions
         shell: pwsh
         run: ./scripts/build-release.ps1 -Version "${{ inputs.version }}"
       - name: Generate SPDX SBOM
@@ -46,12 +46,19 @@ jobs:
       - name: Keyless-sign checksums and artifacts
         shell: pwsh
         run: |
-          Get-ChildItem release -File | Where-Object { $_.Extension -in ".zip", ".json" } | ForEach-Object {
+          Get-ChildItem release -File | Where-Object { $_.Extension -in ".zip", ".json" -and $_.Name -notmatch "Unlocked-Pro" } | ForEach-Object {
             cosign sign-blob --yes --bundle "$($_.FullName).sigstore.json" $_.FullName
           }
           cosign sign-blob --yes --bundle "release/SHA256SUMS.sigstore.json" "release/SHA256SUMS"
       - uses: actions/upload-artifact@v4
         with:
           name: Cuspr-${{ inputs.version }}-signed
-          path: release/
+          path: |
+            release/Cuspr-${{ inputs.version }}-Free.zip
+            release/Cuspr-${{ inputs.version }}-Free-with-Ads.zip
+            release/Cuspr-${{ inputs.version }}-Supporter.zip
+            release/Cuspr-${{ inputs.version }}-Pro.zip
+            release/Cuspr-${{ inputs.version }}.spdx.json
+            release/*.sigstore.json
+            release/SHA256SUMS
           if-no-files-found: error

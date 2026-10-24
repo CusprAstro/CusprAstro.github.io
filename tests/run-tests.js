@@ -42,11 +42,11 @@ function loadLicense(nativeResult) {
   const context = {
     console, localStorage, crypto: crypto.webcrypto, TextEncoder, TextDecoder, URLSearchParams,
     atob: s => Buffer.from(s, "base64").toString("binary"),
-    window: {halleyNative: {verifyGumroad: async () => nativeResult}},
+    window: {halleyNative: {verifyGumroad: async () => typeof nativeResult === "function" ? nativeResult() : nativeResult}},
     esc: String, $: () => null, render: () => {}, go: () => {},
   };
   vm.createContext(context);
-  vm.runInContext(code + "\nthis.api={verifyLicense,activateLicense,loadLicense,deactivateLicense,setAdsEdition,tierKey,tier,sponsoredPlacement,LICENSE_CONFIG};", context);
+  vm.runInContext(code + "\nthis.api={verifyLicense,verifyGumroadKey,activateLicense,loadLicense,deactivateLicense,setAdsEdition,tierKey,tier,sponsoredPlacement,LICENSE_CONFIG,ENTITLEMENT_KEY,OFFLINE_GRACE_MS};", context);
   const payload = Buffer.from(JSON.stringify({t: "pro", n: "Test Buyer"})).toString("base64url");
   const sig = crypto.sign("sha256", Buffer.from(payload), {key: privateKey, dsaEncoding: "ieee-p1363"}).toString("base64url");
   return {context, key: `CUSPR1.${payload}.${sig}`};
@@ -84,7 +84,7 @@ function loadLicense(nativeResult) {
     assert.ok(context.localStorage.getItem("cuspr.entitlement.v2"));
   });
   await test("Gumroad buyer key uses official product mapping and cached entitlement", async () => {
-    const {context} = loadLicense({success: true, purchase: {email: "buyer@example.test", refunded: false, chargebacked: false}});
+    const {context} = loadLicense({success: true, purchase: {email: "buyer@example.test", product_id: "S0wa78i_Tu7s5_A65WTrPg==", refunded: false, chargebacked: false}});
     const result = await context.api.activateLicense("buyer-key-secret", "supporter");
     assert.equal(result.ok, true);
     assert.equal(context.api.tierKey(), "supporter");
@@ -94,6 +94,28 @@ function loadLicense(nativeResult) {
     const {context} = loadLicense({success: true, purchase: {refunded: true}});
     assert.equal((await context.api.activateLicense("buyer-key-secret", "pro")).ok, false);
     assert.equal(context.api.tierKey(), "free");
+  });
+  for (const [label, purchase] of [
+    ["cancelled", {cancelled: true}],
+    ["ended", {subscription_ended_at: "2026-10-01T00:00:00Z"}],
+    ["chargebacked", {chargebacked: true}],
+  ]) await test(`${label} Gumroad membership never unlocks`, async () => {
+    const {context} = loadLicense({success: true, purchase});
+    assert.equal((await context.api.activateLicense("buyer-key-secret", "pro")).ok, false);
+    assert.equal(context.api.tierKey(), "free");
+  });
+  await test("wrong Gumroad product cannot unlock selected edition", async () => {
+    const {context} = loadLicense({success: true, purchase: {product_id: "wrong"}});
+    assert.equal((await context.api.activateLicense("buyer-key-secret", "pro")).ok, false);
+  });
+  await test("offline membership remains during grace and expires afterward", async () => {
+    const {context} = loadLicense(() => { throw new Error("offline"); });
+    const active = {tier: "pro", source: "gumroad", licenseKey: "secret", productId: "B2HpRnlL66EA931sJ9xOlg==", checkedAt: 0, graceUntil: Date.now() + 60000};
+    context.localStorage.setItem(context.api.ENTITLEMENT_KEY, JSON.stringify(active));
+    assert.equal((await context.api.loadLicense()).tier, "pro");
+    active.graceUntil = Date.now() - 1;
+    context.localStorage.setItem(context.api.ENTITLEMENT_KEY, JSON.stringify(active));
+    assert.equal((await context.api.loadLicense()).tier, "free");
   });
   await test("edition gates and sponsored placement rules", () => {
     const {context} = loadLicense({success: false});
@@ -106,8 +128,26 @@ function loadLicense(nativeResult) {
   });
   await test("bundle has no unresolved source placeholders and includes planner", () => {
     const template = read("app/index.html"), bundle = read("app/bundle.py");
-    for (const tag of ["CSS", "ASTRONOMY", "ENGINE", "LICENSE", "PLANNER", "APP"]) assert.ok(template.includes(`/*@@${tag}@@*/`));
+    for (const tag of ["CSS", "ASTRONOMY", "ENGINE", "LICENSE", "PLANNER", "PWA", "APP"]) assert.ok(template.includes(`/*@@${tag}@@*/`));
     assert.match(bundle, /"PLANNER": rd\("planner\.js"\)/);
+  });
+  await test("PWA manifest, service worker, update UX and stable routes are present", () => {
+    const manifest = JSON.parse(read("launch/manifest.webmanifest")), sw = read("launch/sw.js"), pwa = read("app/pwa.js"), site = read("index.html");
+    assert.equal(manifest.display, "standalone");
+    assert.ok(manifest.icons.some(icon => icon.sizes === "512x512" && icon.purpose.includes("maskable")));
+    assert.match(sw, /cuspr-v0\.4\.0-beta/);
+    assert.match(sw, /SKIP_WAITING/);
+    assert.match(pwa, /beforeinstallprompt/);
+    assert.match(pwa, /controllerchange/);
+    assert.match(site, /href="launch\/"/);
+    assert.match(read("product-facts.html"), /https:\/\/cusprastro\.github\.io\/launch\//);
+  });
+  await test("membership prices and offline policy are consistent", () => {
+    const license = read("app/license.js"), landing = read("index.html"), membership = read("membership.html");
+    assert.match(license, /supporter: 4\.99, pro: 9\.99/);
+    assert.match(landing, /\$4\.99/);
+    assert.match(landing, /\$9\.99/);
+    assert.match(membership, /14-day offline grace period|14 days after/);
   });
   await test("responsive, desktop IPC, affiliate, and external link safety surfaces exist", () => {
     const css = read("app/style.css"), main = read("desktop/main.js"), license = read("app/license.js"), app = read("app/app.js");
