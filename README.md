@@ -1,57 +1,95 @@
-# Cuspr (beta v0.1.0)
+# Cuspr v0.3.0-beta
 
-Live: https://cusprastro.github.io/
+Live app: https://cusprastro.github.io/
 
-An interactive astrology app that runs entirely in your browser or offline as a Windows desktop app. Enter a birth date, time and place to get a natal chart, a written reading, and a forecast for the months ahead. Nothing is uploaded.
+Cuspr is a privacy-minded astrology app for the web and Windows. It calculates natal charts locally, writes a structured natal reading, compares chart twins, and turns real ephemeris/transit data into a practical daily **Cosmic Planner**.
 
-## Features
+## Consumer beta highlights
 
-- **Chart:** tropical zodiac, Placidus houses, aspects, interactive wheel
-- **Reading:** personality, career, health, happiness and life-challenge write-ups
-- **Forecast:** transits, eclipses and progressions
-- **Chart Twins:** finds the closest matches among 1,000 famous (and infamous) people
-- **Astrologers & Sites:** a guide to well-regarded astrologers and astrology resources
-- **Astrology News:** a feed from reputable astrology publications
-- **Chat:** community discussion hosted on GitHub Discussions (via [giscus](https://giscus.app))
+- **Natal chart:** tropical zodiac, Placidus houses (whole-sign polar fallback), aspects, downloadable SVG/PNG wheel
+- **Professional reading:** personality, relationships, work, money, well-being and growth themes
+- **Cosmic Planner:** daily and monthly views for overall/luck, love, career, money, energy, travel, creativity, home, communication and rest
+- **Daily context:** best and caution windows, suggested actions, avoid guidance, signal strength/confidence, transit rationale, Moon sign, color cue and entertainment genre
+- **Long-range forecast:** transits, stations, ingresses, lunations, eclipses and secondary progressions
+- **History:** past-date selection for reflective review
+- **Privacy:** profiles stay in browser storage; no Cuspr account is required
+- **Accessibility:** keyboard focus, semantic controls, mobile navigation, improved contrast and reduced-motion support
 
-## Run it
+Astrology is symbolic guidance for reflection and entertainment. It is not medical, legal, financial, relationship or safety advice.
 
-- **Web:** open `index.html` in any modern browser (single self-contained file), or publish it with GitHub Pages using the included workflow.
-- **Windows desktop (offline):** from `desktop/`, run `npm install` then `npm run pack`. Copy the built `index.html` into `desktop/` first.
-- **Rebuild the single file:** `python app/bundle.py` (needs Pillow). Output goes to `app/dist/`.
-- **Chat setup:** see [SETUP.md](SETUP.md).
+## Editions
 
-## How it works
+| | Free | Free with Ads | Supporter | Pro |
+|---|---:|---:|---:|---:|
+| Natal wheel, houses and aspects | yes | yes | yes | yes |
+| Reading | first 3 sections | complete | complete | complete |
+| Transit forecast | 3 months | 6 months | 6 months | 12 months |
+| Cosmic Planner | 1 month | 6 months | 6 months | 12 months |
+| Chart twins | 3 | 10 | 10 | 25 |
+| Profiles | 2 | 10 | 10 | unlimited |
+| Print / PDF | - | yes | yes | yes |
+| Sponsored cards | no | restrained | no | no |
 
-Planetary positions come from [Astronomy Engine](https://github.com/cosinekitty/astronomy) (MIT). Local birth time is converted to UT with the IANA time zone database built into the browser. The Chart Twins data (`app/famous_data.js`) is precomputed by `app/build_famous.js`: 54 curated entries have commonly cited birth times, and the rest use local noon, so their Moon is approximate and Rising/Midheaven are not compared. Their birth dates and places come from Wikidata (CC0), ranked by Wikipedia page views.
+Free with Ads has Supporter-level features. Sponsored cards are clearly labelled, use only publisher-supplied AdGuard affiliate links, never run tracking scripts, never pop up, and never start downloads automatically. Core chart and natal-reading content stays ad-free.
 
-## Beta
+## Run and test
 
-This is the first beta. Expect rough edges; please report issues or share feedback in Discussions.
-
-## Plans and licensing
-
-| | Free | Supporter | Pro |
-|---|---|---|---|
-| Chart wheel, houses, aspects | yes | yes | yes |
-| Natal reading | first 3 sections | complete | complete |
-| Forecast | 3 months | 6 months | 12 months |
-| Chart twins | top 3 | top 10 | top 25 |
-| Saved profiles | 2 | 10 | unlimited |
-| Print / save PDF | - | yes | yes |
-
-Licenses are offline keys signed with ECDSA P-256; the app only contains the public key. Configure your PayPal.me handle, prices and other payment links in `app/license.js` (`LICENSE_CONFIG`). Issue a key for a buyer with:
-
-```
-node tools/keygen.js init                     # once; creates the private key in D:\AstroChart\private (never commit it)
-node tools/keygen.js issue pro "buyer@email"  # prints a CUSPR1.… key to send to the buyer
+```powershell
+python app\bundle.py - index.html
+node tests\test.js
 ```
 
-Test builds with a forced tier: `python app/bundle.py supporter out.html` (`pro` also works; `-` builds the public edition). Client-side checks are honor-system protection and can be bypassed by a determined user.
+Serve the repository instead of using `file://` when testing web APIs:
 
-## Disclaimer
+```powershell
+python -m http.server 4173
+```
 
-Astrology is symbolic and offered for reflection and entertainment. Rankings of astrologers and sites are qualitative, and chart resemblance does not predict anyone's fate.
+## Build edition ZIPs
+
+```powershell
+python -m pip install pillow
+python tools\release.py
+```
+
+This creates deterministic local artifacts under ignored `release-assets\`:
+
+- `Cuspr-0.3.0-beta-free.zip`
+- `Cuspr-0.3.0-beta-free-with-ads.zip`
+- `Cuspr-0.3.0-beta-supporter.zip`
+- `Cuspr-0.3.0-beta-pro.zip`
+- `Cuspr-0.3.0-beta-pro-test.zip` — unlocked publisher-only test build
+- `branding\cuspr-gumroad-icon-600.png` — exact 600×600 Gumroad icon
+- `SHA256SUMS` and an SPDX SBOM
+
+`python tools\release.py --public-only` builds only Free and Free with Ads. The GitHub release workflow uses this mode, so paid product packages and the unlocked Pro test build are never attached to public releases.
+
+For Windows Electron packaging, first run `python tools\prepare_desktop.py <edition>`, then `npm ci` and `npm run pack` in `desktop\`. Generated Electron files and output remain ignored.
+
+## Gumroad and complimentary licensing
+
+The supplied Gumroad strings are configured as **product IDs**, not purchaser keys:
+
+- Supporter: `S0wa78i_Tu7s5_A65WTrPg==`
+- Pro: `B2HpRnlL66EA931sJ9xOlg==`
+
+Customers paste the license key from their Gumroad receipt. Cuspr verifies it against Gumroad's official `/v2/licenses/verify` endpoint, caches successful entitlement metadata locally for offline use, periodically revalidates it, and supports removal. Electron verification uses a narrowly allowlisted IPC handler. Full keys are never logged.
+
+The Gumroad storefront URLs are still missing. Add them to `LICENSE_CONFIG.gumroad.products.supporter.storefront` and `.pro.storefront` in `app\license.js` when available. PayPal.me/lircin remains configured.
+
+Locally signed `CUSPR1.…` complimentary keys remain supported. `tools\keygen.js` keeps the private ECDSA key outside the repository; never commit it.
+
+## Releases and signatures
+
+`.github\workflows\release.yml` builds public packages, produces checksums and an SPDX SBOM, then uses Cosign keyless OIDC signing. Tagged builds publish each artifact with `.sig`, `.pem` and `.bundle` verification material.
+
+Cosign signatures verify workflow provenance and artifact integrity. They are **not Windows Authenticode signatures** and do not remove SmartScreen warnings from Electron executables. See [RELEASE.md](RELEASE.md).
+
+## Data and method
+
+Planetary positions come from [Astronomy Engine](https://github.com/cosinekitty/astronomy) (MIT). Time zones use the browser's IANA database. The Chart Twins dataset includes curated timed charts and Wikidata-derived date/place records; unknown times are calculated at local noon and do not compare angles.
+
+Chat setup is documented in [SETUP.md](SETUP.md).
 
 ## License
 

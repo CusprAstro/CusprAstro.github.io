@@ -20,7 +20,7 @@ function parseRss(xml, feed) {
   }).filter(x => x.title && x.link);
 }
 async function loadFeed(feed) {
-  if (window.halleyNative) return parseRss(await window.halleyNative.fetchText(feed.url), feed);
+  if (window.cusprNative) return parseRss(await window.cusprNative.fetchText(feed.url), feed);
   const r = await fetch("https://api.rss2json.com/v1/api.json?rss_url=" + encodeURIComponent(feed.url));
   const j = await r.json();
   if (j.status !== "ok") throw new Error("feed unavailable");
@@ -28,7 +28,7 @@ async function loadFeed(feed) {
     summary: strip(it.description).slice(0, 240), img: it.thumbnail || (it.enclosure && it.enclosure.link) || ((it.content || "").match(/<img[^>]+src=["']([^"']+)/i) || [])[1] || ""}));
 }
 async function loadNews(force) {
-  const KEY = "halley.news";
+  const KEY = "cuspr.news";
   try { const c = JSON.parse(localStorage.getItem(KEY) || "null"); if (!force && c && Date.now() - c.t < 3600e3) return c; } catch (e) {}
   const res = await Promise.allSettled(FEEDS.map(loadFeed));
   const per = {}, items = res.flatMap(r => r.status === "fulfilled" ? r.value : []).sort((a, b) => b.date - a.date).filter(x => (per[x.source] = (per[x.source] || 0) + 1) <= 4);

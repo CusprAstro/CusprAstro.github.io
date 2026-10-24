@@ -3,27 +3,32 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#080d24">
 <title>Cuspr: Birth Chart and Forecast</title>
 <link rel="icon" href="icon.png">
 <style>/*@@CSS@@*/</style>
 </head>
 <body>
+<a class="skip" href="#main">Skip to content</a>
 <canvas id="stars"></canvas>
 <header class="top">
-  <div class="brand"><img src="icon.png" alt=""><div>Cuspr <small style="display:inline;color:var(--gold)">BETA</small><small>Chart · Reading · Forecast</small></div></div>
-  <div class="search"><input id="q" placeholder="Search readings, sources, astrologers…" autocomplete="off"></div>
+  <div class="brand"><img src="icon.png" alt="Cuspr"><div>Cuspr <small style="display:inline;color:var(--gold)">BETA</small><small>Chart · Reading · Cosmic Planner</small></div></div>
+  <div class="search"><label class="sr-only" for="q">Search Cuspr resources</label><input id="q" placeholder="Search readings, sources, astrologers…" autocomplete="off"></div>
+  <div id="editionBadge"></div>
   <div class="who" id="who"><div class="av" id="whoav">?</div><span id="whoname">No profile</span></div>
 </header>
 <div class="shell">
-  <nav class="side" id="nav"></nav>
-  <main class="main" id="main"></main>
+  <nav class="side" id="nav" aria-label="Primary"></nav>
+  <main class="main" id="main" tabindex="-1"></main>
   <aside class="rail" id="rail"></aside>
 </div>
-<div class="foot">Astrology is a symbolic tradition, not a validated science. Use it for reflection, not for medical, legal or financial decisions.</div>
+<div class="foot">Cuspr provides symbolic guidance for reflection and entertainment, not medical, legal, safety or financial advice.</div>
+<noscript><div class="card">Cuspr requires JavaScript to calculate charts locally in your browser.</div></noscript>
 <script>/*@@ASTRONOMY@@*/</script>
 <script>/*@@ENGINE@@*/</script>
 <script>/*@@INTERP@@*/</script>
 <script>/*@@READING@@*/</script>
+<script>/*@@PLANNER@@*/</script>
 <script>/*@@REF@@*/</script>
 <script>/*@@FAMOUS@@*/</script>
 <script>/*@@FAMOUSDATA@@*/</script>

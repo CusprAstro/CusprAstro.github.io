@@ -38,6 +38,11 @@
         <path d="M0 -360v-26" transform="rotate(270)"/><path d="M0 -360v-26" transform="rotate(300)"/><path d="M0 -360v-26" transform="rotate(330)"/>
       </g>
     </g>
+    <!-- Cuspr orbital signature -->
+    <path d="M210 790C80 620 120 345 305 205" fill="none" stroke="#ffdc98" stroke-opacity="0.78" stroke-width="9" stroke-linecap="round"/>
+    <path d="M820 190C900 285 930 390 920 500" fill="none" stroke="#8bc5ff" stroke-opacity="0.58" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="198" cy="786" r="14" fill="#ffeec2"/>
+    <circle cx="828" cy="188" r="8" fill="#ffffff"/>
     <!-- stars -->
     <g fill="#ffffff">
       <circle cx="170" cy="180" r="5" opacity="0.8"/><circle cx="300" cy="120" r="3" opacity="0.6"/><circle cx="880" cy="170" r="4" opacity="0.7"/>
