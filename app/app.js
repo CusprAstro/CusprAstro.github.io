@@ -8,9 +8,10 @@ const store = {
   set active(v) { try { localStorage.setItem("halley.active", v); } catch (e) {} },
 };
 const EXAMPLE = {name: "Example (Hinsdale, IL)", y: 1986, mo: 4, d: 22, h: 1, mi: 9, place: "Hinsdale, Illinois, United States", lat: 41.8008, lon: -87.937, tz: "America/Chicago"};
-const VIEWS = [["home", "🪐", "Birth Data"], ["chart", "🌌", "Chart"], ["reading", "📖", "Reading"], ["forecast", "🔭", "Forecast"], ["twins", "👯", "Chart Twins"], ["sources", "⭐", "Astrologers & Sites"], ["news", "📰", "Astrology News"], ["chat", "💬", "Chat"], ["plans", "💎", "Plans"], ["about", "ℹ️", "Method"]];
+const VIEWS = [["home", "🪐", "Birth Data"], ["planner", "✦", "Cosmic Planner"], ["chart", "🌌", "Chart"], ["reading", "📖", "Reading"], ["forecast", "🔭", "Forecast"], ["twins", "👯", "Chart Twins"], ["sources", "⭐", "Astrologers & Sites"], ["news", "📰", "Astrology News"], ["chat", "💬", "Chat"], ["plans", "💎", "Plans"], ["about", "ℹ️", "Method"]];
 const HUES = [["#4a7bff", "#a05cff"], ["#ff7a59", "#ffb347"], ["#18b89a", "#4ad0ff"], ["#e0529c", "#8e5cff"], ["#7ac74f", "#2fb5a6"]];
 let view = "home", chart = null, prof = null, fcCache = {}, srcTab = "sites", srcQuery = "";
+let plannerMonth = new Date().toISOString().slice(0, 7), plannerSelected = new Date().toISOString().slice(0, 10), plannerFilter = "overall";
 
 const to24 = (h, ap) => { h = Math.min(12, Math.max(1, +h || 12)) % 12; return ap === "PM" ? h + 12 : h; };
 const fmt12 = (h, mi) => `${h % 12 || 12}:${String(mi).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
@@ -30,7 +31,7 @@ function header() {
   $("#whoname").textContent = prof ? prof.name : "No profile";
 }
 function nav() {
-  $("#nav").innerHTML = VIEWS.map(([k, ic, t]) => `<div class="nav ${view === k ? "on" : ""}" data-v="${k}"><i>${ic}</i><span>${t}</span></div>`).join("");
+  $("#nav").innerHTML = VIEWS.map(([k, ic, t]) => `<button class="nav ${view === k ? "on" : ""}" data-v="${k}" aria-current="${view === k ? "page" : "false"}"><i aria-hidden="true">${ic}</i><span>${t}</span></button>`).join("");
   $("#nav").querySelectorAll(".nav").forEach(n => n.onclick = () => go(n.dataset.v));
 }
 function go(v) { view = v; nav(); render(); window.scrollTo({top: 0, behavior: "smooth"}); }
@@ -46,6 +47,7 @@ function render() {
   else if (view === "news") { m.innerHTML = newsShell(); runNews(); }
   else if (view === "chat") { m.innerHTML = chatShell(); runChat(); }
   else if (!chart) m.innerHTML = needChart();
+  else if (view === "planner") m.innerHTML = plannerView();
   else if (view === "twins") m.innerHTML = twinsView();
   else if (view === "chart") m.innerHTML = chartView();
   else if (view === "reading") m.innerHTML = readingView();
@@ -84,7 +86,7 @@ function homeView() {
     <p class="tiny">Time zone and daylight-saving rules for the birth date are applied automatically. You can type coordinates manually if you are offline.</p>
     <div class="msg" id="fmsg"></div>
     <div class="actions"><button class="btn" type="submit">Calculate my chart ✨</button><button class="btn ghost" type="button" id="fex">Load example</button></div>
-  </form></div>`;
+  </form></div>${sponsoredPlacement("home")}`;
 }
 function bindHome() {
   const f = $("#f"); if (!f) return;
@@ -234,7 +236,7 @@ function runForecast() {
           const ev = scanForecast(chart, start, Math.round(fcMonths * 30.5));
           fcCache[key] = forecastReading(chart, start, fcMonths, ev);
         }
-        out.innerHTML = forecastHtml(fcCache[key]);
+        out.innerHTML = forecastHtml(fcCache[key]) + sponsoredPlacement("forecast-end");
       } catch (e) { out.innerHTML = `<div class="card"><p class="msg err">Forecast failed: ${esc(e.message)}</p></div>`; }
     }, 40);
   };
@@ -246,6 +248,64 @@ function forecastHtml(f) {
   const pr = `<p class="mut">Secondary progressions, age ${f.progressed.age.toFixed(1)}</p>` + f.progressed.items.map(t => `<p>${esc(t)}</p>`).join("");
   const months = f.months.map(m => `<div class="card fade"><div class="month"><h2>${esc(m.month)}</h2></div>${m.items.sort((a, b) => new Date(a.date) - new Date(b.date)).map(i => `<div class="ev"><b>${esc(i.date)}</b><span>${esc(i.text)}</span></div>`).join("")}</div>`).join("");
   return `<div class="card fade"><h2>Where the slow planets are now</h2>${cur}</div><div class="card fade"><h2>Major themes</h2>${th}</div><div class="card fade"><h2>Progressed chart</h2>${pr}</div>${months}`;
+}
+
+/* ---------- Cosmic Planner ---------- */
+function plannerAllowedMonth(year, month) {
+  if (tier().plannerHistory >= 24) return true;
+  const now = new Date(), target = new Date(year, month - 1, 1);
+  const delta = (now.getFullYear() - target.getFullYear()) * 12 + now.getMonth() - target.getMonth();
+  return delta >= 0 && delta <= tier().plannerHistory;
+}
+function plannerScoreClass(score) {
+  return score >= 72 ? "score-strong" : score >= 58 ? "score-good" : score >= 43 ? "score-mixed" : "score-caution";
+}
+function plannerDayDetails(day) {
+  if (!day) return "";
+  const categories = Object.entries(PLANNER_CATEGORIES).map(([key, cat]) => `<div class="score-row"><span>${cat.icon} ${esc(cat.label)}</span><meter min="0" max="100" value="${day.scores[key]}">${day.scores[key]}</meter><b class="${plannerScoreClass(day.scores[key])}">${day.scores[key]}</b></div>`).join("");
+  const reasonKey = plannerFilter === "overall" ? day.strongest : plannerFilter;
+  return `<section class="card planner-detail fade" aria-labelledby="planner-date-title">
+    <div class="planner-detail-head"><div><div class="tier">${new Date(day.date + "T12:00:00").toLocaleDateString(undefined, {weekday: "long", month: "long", day: "numeric", year: "numeric"})}</div><h2 id="planner-date-title">${day.scores.overall}/100 · ${plannerAccessibleScore(day.scores.overall)}</h2></div><span class="moon-dot" style="--moon:${day.moon.color}" aria-hidden="true">☾</span></div>
+    <div class="chips"><span class="chip g">Moon in ${day.moon.sign}</span><span class="chip">${day.moon.theme}</span><span class="chip">${day.moon.genre}</span><span class="chip">${day.confidence}% confidence</span></div>
+    <div class="planner-scores">${categories}</div>
+    <div class="grid2 compact"><div><h3>Why ${esc(PLANNER_CATEGORIES[reasonKey].label)} scores this way</h3><ul>${day.reasons[reasonKey].map(r => `<li>${esc(r)}</li>`).join("")}</ul></div>
+    <div><h3>Suggested</h3><ul>${day.suggested.map(x => `<li>${esc(x)}</li>`).join("")}</ul><h3>Avoid</h3><ul>${day.avoid.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div></div>
+    <p class="tiny">Scores compare symbolic transit patterns with this natal chart. Confidence reflects the amount and tightness of transit evidence, not certainty about events.</p></section>`;
+}
+function plannerView() {
+  const [year, month] = plannerMonth.split("-").map(Number);
+  if (!plannerAllowedMonth(year, month)) return `${lockCard("Planner history for this month", "pro")}<div class="card"><button class="btn sm ghost" id="planner-today">Return to current month</button></div>`;
+  const days = buildPlannerMonth(chart, year, month);
+  const limit = tier().plannerDays;
+  const today = new Date(), currentMonth = today.getFullYear() === year && today.getMonth() + 1 === month;
+  const visible = days.map((d, i) => ({...d, locked: limit < days.length && (!currentMonth || Math.abs(i + 1 - today.getDate()) > 3)}));
+  const firstDow = new Date(year, month - 1, 1).getDay();
+  const cells = Array.from({length: firstDow}, () => `<span class="cal-blank" aria-hidden="true"></span>`).concat(visible.map((d, i) => {
+    const score = d.scores[plannerFilter] || d.scores.overall, selected = d.date === plannerSelected;
+    return `<button class="cal-day ${selected ? "selected" : ""} ${d.locked ? "locked" : ""}" data-date="${d.date}" ${d.locked ? 'aria-label="Locked day"' : `aria-label="${d.date}, ${PLANNER_CATEGORIES[plannerFilter].label} score ${score}"`}><span>${i + 1}</span>${d.locked ? "<b>🔒</b>" : `<b class="${plannerScoreClass(score)}">${score}</b>`}</button>`;
+  })).join("");
+  const ranked = plannerRank(visible.filter(d => !d.locked)), pick = visible.find(d => d.date === plannerSelected && !d.locked) || visible.find(d => !d.locked);
+  plannerSelected = pick ? pick.date : plannerSelected;
+  const rankList = items => items.map(d => `<button class="rank-day" data-date="${d.date}"><span>${new Date(d.date + "T12:00:00").toLocaleDateString(undefined, {month: "short", day: "numeric"})}</span><b>${d.scores.overall}</b></button>`).join("");
+  return `<div class="card hero planner-hero fade"><h1>Cosmic Planner</h1><p>Daily transit-derived timing for reflection and planning. Explore overall momentum or focus on relationships, work, purchases, energy, travel, creativity, home, communication and rest.</p>
+    <div class="planner-controls"><label>Month<input type="month" id="planner-month" value="${plannerMonth}"></label><label>Focus<select id="planner-filter">${Object.entries(PLANNER_CATEGORIES).map(([k, c]) => `<option value="${k}" ${k === plannerFilter ? "selected" : ""}>${esc(c.label)}</option>`).join("")}</select></label><button class="btn sm ghost" id="planner-today">Today</button></div></div>
+  <div class="planner-summary"><div class="card"><h2>Best days</h2>${rankList(ranked.best)}</div><div class="card"><h2>Caution days</h2>${rankList(ranked.caution)}</div></div>
+  <div class="card calendar-wrap"><div class="calendar-week"><span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span></div><div class="calendar-grid">${cells}</div>
+  ${limit < days.length ? `<p class="tiny">Free shows a rolling 7-day window. Free with Ads and paid editions unlock the full current month.</p>` : ""}</div>
+  ${plannerDayDetails(pick)}
+  <div class="card"><p class="tiny"><b>Reflection and entertainment only.</b> This planner is not medical, financial, legal, safety or travel advice. Health & energy is non-medical; use professional guidance and real-world conditions for decisions.</p></div>`;
+}
+function bindPlanner() {
+  const month = $("#planner-month");
+  if (month) month.onchange = () => { plannerMonth = month.value; plannerSelected = `${month.value}-01`; render(); };
+  const filter = $("#planner-filter");
+  if (filter) filter.onchange = () => { plannerFilter = filter.value; render(); };
+  const today = $("#planner-today");
+  if (today) today.onclick = () => { plannerMonth = new Date().toISOString().slice(0, 7); plannerSelected = new Date().toISOString().slice(0, 10); render(); };
+  document.querySelectorAll("[data-date]").forEach(el => el.onclick = () => {
+    if (el.classList.contains("locked")) return go("plans");
+    plannerSelected = el.dataset.date; render();
+  });
 }
 
 /* ---------- Chart twins ---------- */
@@ -279,7 +339,7 @@ function runNews() {
     const safeImg = u => /^https:\/\//.test(u || "") ? u : "";
     out.innerHTML = (n.stale ? `<p class="msg">Showing saved articles (offline).</p>` : "") +
       `<div class="grid2">${n.items.slice(0, 36).map(a => `<a class="card lift news fade" href="${esc(a.link)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">${safeImg(a.img) ? `<img src="${esc(safeImg(a.img))}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">` : ""}<div class="tier" style="font-size:11px;letter-spacing:1px;color:var(--gold);font-weight:700;text-transform:uppercase">${esc(a.source)}${a.date ? " · " + new Date(a.date).toLocaleDateString("en-US", {month: "short", day: "numeric", year: "numeric"}) : ""}</div><h3 style="color:var(--txt);margin:4px 0 6px">${esc(a.title)}</h3><p class="tiny">${esc(a.summary)}</p></a>`).join("")}</div>` +
-      (n.failed && n.failed.length ? `<p class="tiny">Unavailable right now: ${esc(n.failed.join(", "))}.</p>` : "");
+      (n.failed && n.failed.length ? `<p class="tiny">Unavailable right now: ${esc(n.failed.join(", "))}.</p>` : "") + sponsoredPlacement("news-end");
   };
   $("#nrefresh").onclick = () => go(true); go(false);
 }
@@ -298,9 +358,10 @@ function aboutView() {
   <h3>Zodiac and houses</h3><p>Tropical zodiac and Placidus houses, the default in most Western astrology software. Above about 66° latitude Placidus is undefined, so whole-sign houses are used instead.</p>
   <h3>Time</h3><p>Local birth time is converted to UT using the IANA time zone database built into your browser, including historical daylight-saving rules.</p>
   <h3>Aspects</h3><p>Conjunction, sextile, square, trine and opposition with moderate orbs. Forecasts use transits from Jupiter to Pluto, Mars, and the lunar node to natal points, plus stations, sign changes, lunations, eclipses, and secondary progressions.</p>
+  <h3>Cosmic Planner</h3><p>Planner scores are calculated from the day's real planetary longitudes, transit aspects to natal points, aspect tightness, planetary emphasis and transit houses. They summarize symbolic timing rather than predicting events. Confidence describes the amount of supporting transit evidence, not factual certainty.</p>
   <h3>Interpretation</h3><p>Texts are written from common Western interpretive traditions (modern psychological and traditional). They are symbolic and general, and are not predictions of fact or advice.</p>
   <h3>Famous charts</h3><p>The Chart Twins database holds 1,000 well-known people: 54 curated entries with commonly cited birth times, and the rest ranked by Wikipedia page views, with birth dates and places from Wikidata (CC0). Entries without a known time are computed for local noon.</p>
-  <h3>Privacy</h3><p>Profiles are stored only in this browser (localStorage). Place search sends only the city name to the Open-Meteo geocoding service; skip it by typing coordinates manually.</p></div>`;
+  <h3>Privacy</h3><p>Profiles, planner cache and entitlements are stored only in this browser (localStorage). Place search sends only the city name to Open-Meteo. Gumroad verification sends the selected product ID and buyer key only to Gumroad's official license endpoint; full keys are not logged.</p></div>`;
 }
 
 /* ---------- Rail ---------- */
@@ -315,7 +376,7 @@ function rail() {
 }
 
 function bind() {
-  bindHome(); bindChart();
+  bindHome(); bindChart(); bindPlanner();
   document.querySelectorAll("[data-tab]").forEach(t => t.onclick = () => { srcTab = t.dataset.tab; render(); });
 }
 

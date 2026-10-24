@@ -1,9 +1,12 @@
 {
-  "name": "halley-astro",
+  "name": "cuspr",
   "productName": "Cuspr",
-  "version": "1.0.0",
-  "description": "Offline birth chart, reading and forecast app",
+  "version": "0.3.0-beta.1",
+  "description": "Private birth chart, Cosmic Planner, reading and forecast app",
   "main": "main.js",
-  "scripts": {"pack": "electron-packager . Cuspr --platform=win32 --arch=x64 --icon=icon.ico --out=out --overwrite --prune=true --ignore=out"},
+  "scripts": {
+    "pack": "electron-packager . Cuspr --platform=win32 --arch=x64 --icon=icon.ico --out=out --overwrite --prune=true --ignore=out",
+    "test": "node ../tests/run-tests.js"
+  },
   "devDependencies": {"electron": "^33.0.0", "@electron/packager": "^18.3.0"}
 }
